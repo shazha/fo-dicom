@@ -22,6 +22,7 @@
 * [Johannes Liegert](https://github.com/0xLigety)
 * [Aerik Sylvan](https://github.com/aerik)
 * [Michael Pavlovsky](https://github.com/michaelp)
+* [Marc Berreth](https://github.com/Marber1973)
 * [lste](https://github.com/lste)
 * [captainstark](https://github.com/captainstark)
 * [do0om](https://github.com/do0om)
@@ -68,3 +69,4 @@
 * [Abdullah Islam](https://github.com/abdullah248)
 * [Martin Nguyen](https://github.com/gladiatus55)
 * [James Allsopp](https://github.com/EthicsGradient)
+* [Gabriel Schafflützel](https://github.com/gasupidupi)

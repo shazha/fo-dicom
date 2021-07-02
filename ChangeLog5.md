@@ -1,6 +1,16 @@
 #### 5.0.0
 
+
+
+#### 5.0.0-alpha5 (2021-05-25)
+
+* Add missing properties to IDicomClient interface (#1171)
 * Fix unintended breaking change, where StringValue of tags with length 0 returned null, but should return string.empty.
+* Be more tollerant to recognize Encoding by ignoring the difference of Underlande and Space.
+* JsonDicom supports some VRs as number as well as as string. (#1161)
+* Fix anonymizing private tags with explicit transfer syntax (#1181)
+* Internal calculation of pixel values are done as double instead of int to avoid consequential errors when calculating (#1153)
+* Fix: DicomDirectory did throw exception on calling constructor with no parameters (#1176)
 
 #### 5.0.0-alpha4 (2021-03-01)
 
