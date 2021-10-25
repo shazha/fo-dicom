@@ -37,7 +37,7 @@ namespace FellowOakDicom.Tests
 
             var dataset = new DicomDataset(_minimumDatatset)
             {
-                new DicomLongString(tag, DicomEncoding.Default, new MemoryByteBuffer(DicomEncoding.GetEncoding("ISO IR 192").GetBytes(expected)))
+                new DicomLongString(tag, DicomEncoding.DefaultArray, new MemoryByteBuffer(DicomEncoding.GetEncoding("ISO IR 192").GetBytes(expected)))
             };
 
             var outFile = new DicomFile(dataset);
@@ -59,7 +59,7 @@ namespace FellowOakDicom.Tests
 
             var dataset = new DicomDataset(_minimumDatatset)
             {
-                new DicomLongString(tag, DicomEncoding.Default, new MemoryByteBuffer(DicomEncoding.GetEncoding("ISO IR 192").GetBytes(expected)))
+                new DicomLongString(tag, DicomEncoding.DefaultArray, new MemoryByteBuffer(DicomEncoding.GetEncoding("ISO IR 192").GetBytes(expected)))
             };
 
             var outFile = new DicomFile(dataset);
@@ -116,6 +116,15 @@ namespace FellowOakDicom.Tests
             var actual = inFile.Dataset.GetString(tag);
 
             Assert.Equal(expected, actual);
+        }
+
+        [Fact]
+        public void Open_TooSmallFile_Raises()
+        {
+            var stream = new MemoryStream(new byte[20]);
+            var exception = Record.Exception( () => DicomFile.Open(stream));
+            Assert.IsType<DicomFileException>(exception);
+            Assert.StartsWith("Not a valid DICOM file", exception.Message);
         }
 
         [Fact]

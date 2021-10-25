@@ -192,9 +192,10 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="fileName">The filename of the DICOM file</param>
         /// <param name="readOption">An option how to deal with large dicom tags like pixel data.</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>DicomFile instance</returns>
-        public static DicomFile Open(string fileName, FileReadOption readOption = FileReadOption.Default)
-            => Open(fileName, DicomEncoding.Default, readOption: readOption);
+        public static DicomFile Open(string fileName, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
+            => Open(fileName, DicomEncoding.Default, readOption: readOption, largeObjectSize: largeObjectSize);
 
         /// <summary>
         /// Reads the specified filename and returns a DicomFile object.  Note that the values for large
@@ -204,8 +205,10 @@ namespace FellowOakDicom
         /// <param name="fileName">The filename of the DICOM file</param>
         /// <param name="fallbackEncoding">Encoding to apply when attribute Specific Character Set is not available.</param>
         /// <param name="stop">Stop criterion in dataset.</param>
+        /// <param name="readOption">Option how to deal with large values, if they should be loaded directly into memory or lazy loaded on demand</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>DicomFile instance</returns>
-        public static DicomFile Open(string fileName, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default)
+        public static DicomFile Open(string fileName, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
         {
             if (fallbackEncoding == null)
             {
@@ -218,7 +221,7 @@ namespace FellowOakDicom
                 df.File = Setup.ServiceProvider.GetService<IFileReferenceFactory>().Create(fileName);
 
                 using var unvalidatedDataset = new UnvalidatedScope(df.Dataset);
-                using var source = new FileByteSource(df.File, readOption);
+                using var source = new FileByteSource(df.File, readOption, largeObjectSize);
                 var reader = new DicomFileReader();
                 var result = reader.Read(
                     source,
@@ -226,18 +229,10 @@ namespace FellowOakDicom
                     new DicomDatasetReaderObserver(df.Dataset, fallbackEncoding),
                     stop);
 
-                if (result == DicomReaderResult.Processing)
-                {
-                    throw new DicomFileException(df, $"Invalid read return state: {result}");
-                }
-                if (result == DicomReaderResult.Error)
-                {
-                    return null;
-                }
+                HandleOpenError(df, result);
+
                 df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
-
                 df.Format = reader.FileFormat;
-
                 df.Dataset.InternalTransferSyntax = reader.Syntax;
 
                 return df;
@@ -253,9 +248,10 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="stream">Stream to read.</param>
         /// <param name="readOption">The option how to deal with large DICOM tags like pixel data.</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passed, then the default of 64k is used.</param>
         /// <returns>Read <see cref="DicomFile"/>.</returns>
-        public static DicomFile Open(Stream stream, FileReadOption readOption = FileReadOption.Default)
-            => Open(stream, DicomEncoding.Default, readOption: readOption);
+        public static DicomFile Open(Stream stream, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
+            => Open(stream, DicomEncoding.Default, readOption: readOption, largeObjectSize: largeObjectSize);
 
         /// <summary>
         /// Read a DICOM file from stream.
@@ -264,8 +260,9 @@ namespace FellowOakDicom
         /// <param name="fallbackEncoding">Encoding to use if encoding cannot be obtained from DICOM file.</param>
         /// <param name="stop">Stop criterion in dataset.</param>
         /// <param name="readOption">The option how to deal with large DICOM tag like pixel data</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>Read <see cref="DicomFile"/>.</returns>
-        public static DicomFile Open(Stream stream, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default)
+        public static DicomFile Open(Stream stream, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
         {
             if (fallbackEncoding == null)
             {
@@ -275,7 +272,7 @@ namespace FellowOakDicom
 
             try
             {
-                var source = new StreamByteSource(stream, readOption);
+                var source = new StreamByteSource(stream, readOption, largeObjectSize);
 
                 using var unvalidated = new UnvalidatedScope(df.Dataset);
                 var reader = new DicomFileReader();
@@ -285,18 +282,10 @@ namespace FellowOakDicom
                     new DicomDatasetReaderObserver(df.Dataset, fallbackEncoding),
                     stop);
 
-                if (result == DicomReaderResult.Processing)
-                {
-                    throw new DicomFileException(df, $"Invalid read return state: {result}");
-                }
-                if (result == DicomReaderResult.Error)
-                {
-                    return null;
-                }
+                HandleOpenError(df, result);
+
                 df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
-
                 df.Format = reader.FileFormat;
-
                 df.Dataset.InternalTransferSyntax = reader.Syntax;
 
                 return df;
@@ -314,9 +303,10 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="fileName">The filename of the DICOM file</param>
         /// <param name="readOption">The option how to deal with large dicom tags like pixel data.</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>Awaitable <see cref="DicomFile"/> instance.</returns>
-        public static Task<DicomFile> OpenAsync(string fileName, FileReadOption readOption = FileReadOption.Default)
-            => OpenAsync(fileName, DicomEncoding.Default, readOption: readOption);
+        public static Task<DicomFile> OpenAsync(string fileName, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
+            => OpenAsync(fileName, DicomEncoding.Default, readOption: readOption, largeObjectSize: largeObjectSize);
 
         /// <summary>
         /// Asynchronously reads the specified filename and returns a DicomFile object.  Note that the values for large
@@ -326,8 +316,10 @@ namespace FellowOakDicom
         /// <param name="fileName">The filename of the DICOM file</param>
         /// <param name="fallbackEncoding">Encoding to apply when attribute Specific Character Set is not available.</param>
         /// <param name="stop">Stop criterion in dataset.</param>
+        /// <param name="readOption">Option how to deal with large values, if they should be loaded directly into memory or lazy loaded on demand</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>Awaitable <see cref="DicomFile"/> instance.</returns>
-        public static async Task<DicomFile> OpenAsync(string fileName, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default)
+        public static async Task<DicomFile> OpenAsync(string fileName, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
         {
             if (fallbackEncoding == null)
             {
@@ -340,7 +332,7 @@ namespace FellowOakDicom
                 df.File = Setup.ServiceProvider.GetService<IFileReferenceFactory>().Create(fileName);
 
                 using var unvalidated = new UnvalidatedScope(df.Dataset);
-                using var source = new FileByteSource(df.File, readOption);
+                using var source = new FileByteSource(df.File, readOption, largeObjectSize);
                 var reader = new DicomFileReader();
                 var result =
                     await
@@ -350,16 +342,9 @@ namespace FellowOakDicom
                         new DicomDatasetReaderObserver(df.Dataset, fallbackEncoding),
                         stop).ConfigureAwait(false);
 
-                if (result == DicomReaderResult.Processing)
-                {
-                    throw new DicomFileException(df, $"Invalid read return state: {result}");
-                }
-                if (result == DicomReaderResult.Error)
-                {
-                    return null;
-                }
-                df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
+                HandleOpenError(df, result);
 
+                df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
                 df.Format = reader.FileFormat;
                 df.Dataset.InternalTransferSyntax = reader.Syntax;
 
@@ -376,9 +361,10 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="stream">Stream to read.</param>
         /// <param name="readOption">The option how to deal with large DICOM tags like pixel data.</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>Awaitable <see cref="DicomFile"/> instance.</returns>
-        public static Task<DicomFile> OpenAsync(Stream stream, FileReadOption readOption = FileReadOption.Default)
-            => OpenAsync(stream, DicomEncoding.Default, readOption: readOption);
+        public static Task<DicomFile> OpenAsync(Stream stream, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
+            => OpenAsync(stream, DicomEncoding.Default, readOption: readOption, largeObjectSize: largeObjectSize);
 
         /// <summary>
         /// Asynchronously read a DICOM file from stream.
@@ -387,8 +373,9 @@ namespace FellowOakDicom
         /// <param name="fallbackEncoding">Encoding to use if encoding cannot be obtained from DICOM file.</param>
         /// <param name="stop">Stop criterion in dataset.</param>
         /// <param name="readOption">The option how to deal with large DICOM tags like pixel data.</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>Awaitable <see cref="DicomFile"/> instance.</returns>
-        public static async Task<DicomFile> OpenAsync(Stream stream, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default)
+        public static async Task<DicomFile> OpenAsync(Stream stream, Encoding fallbackEncoding, Func<ParseState, bool> stop = null, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
         {
             if (fallbackEncoding == null)
             {
@@ -398,7 +385,7 @@ namespace FellowOakDicom
 
             try
             {
-                var source = new StreamByteSource(stream, readOption);
+                var source = new StreamByteSource(stream, readOption, largeObjectSize);
                 using var unvalidated = new UnvalidatedScope(df.Dataset);
                 var reader = new DicomFileReader();
                 var result =
@@ -409,16 +396,9 @@ namespace FellowOakDicom
                         new DicomDatasetReaderObserver(df.Dataset, fallbackEncoding),
                         stop).ConfigureAwait(false);
 
-                if (result == DicomReaderResult.Processing)
-                {
-                    throw new DicomFileException(df, $"Invalid read return state: {result}");
-                }
-                if (result == DicomReaderResult.Error)
-                {
-                    return null;
-                }
-                df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
+                HandleOpenError(df, result);
 
+                df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
                 df.Format = reader.FileFormat;
                 df.Dataset.InternalTransferSyntax = reader.Syntax;
 
@@ -465,8 +445,10 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="file">The file reference of the DICOM file</param>
         /// <param name="fallbackEncoding">Encoding to apply when attribute Specific Character Set is not available.</param>
+        /// <param name="readOption">Option how to deal with large values, if they should be loaded directly into memory or lazy loaded on demand</param>
+        /// <param name="largeObjectSize">Custom limit of what are large values and what are not. If 0 is passend, then the default of 64k is used.</param>
         /// <returns>DicomFile instance</returns>
-        internal static DicomFile Open(IFileReference file, Encoding fallbackEncoding, FileReadOption readOption = FileReadOption.Default)
+        internal static DicomFile Open(IFileReference file, Encoding fallbackEncoding, FileReadOption readOption = FileReadOption.Default, int largeObjectSize = 0)
         {
             if (fallbackEncoding == null)
             {
@@ -478,7 +460,7 @@ namespace FellowOakDicom
             {
                 df.File = file;
 
-                using var source = new FileByteSource(file, readOption);
+                using var source = new FileByteSource(file, readOption, largeObjectSize);
                 using var unvalidated = new UnvalidatedScope(df.Dataset);
                 var reader = new DicomFileReader();
                 var result = reader.Read(
@@ -486,18 +468,10 @@ namespace FellowOakDicom
                     new DicomDatasetReaderObserver(df.FileMetaInfo),
                     new DicomDatasetReaderObserver(df.Dataset, fallbackEncoding));
 
-                if (result == DicomReaderResult.Processing)
-                {
-                    throw new DicomFileException(df, $"Invalid read return state: {result}");
-                }
-                if (result == DicomReaderResult.Error)
-                {
-                    return null;
-                }
+                HandleOpenError(df, result);
+
                 df.IsPartial = result == DicomReaderResult.Stopped || result == DicomReaderResult.Suspended;
-
                 df.Format = reader.FileFormat;
-
                 df.Dataset.InternalTransferSyntax = reader.Syntax;
 
                 return df;
@@ -513,6 +487,22 @@ namespace FellowOakDicom
         /// </summary>
         protected virtual void OnSave()
         {
+        }
+
+        /// <summary>
+        /// Throw if reading the file resulted in an error.
+        /// </summary>
+        /// <exception cref="DicomFileException">If the file could not be read properly.</exception>
+        protected static void HandleOpenError(DicomFile dicomFile, DicomReaderResult result)
+        {
+            switch (result)
+            {
+                case DicomReaderResult.Processing:
+                    throw new DicomFileException(dicomFile,
+                        $"Failed to parse {dicomFile} - probably not a valid DICOM file");
+                case DicomReaderResult.Error:
+                    throw new DicomFileException(dicomFile, $"Not a valid DICOM file: {dicomFile}");
+            }
         }
 
         /// <summary>

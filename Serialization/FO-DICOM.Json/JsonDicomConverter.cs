@@ -22,7 +22,9 @@ namespace FellowOakDicom.Serialization
     {
         private readonly bool _writeTagsAsKeywords;
         private readonly bool _autoValidate;
-        private readonly static Encoding _jsonTextEncoding = Encoding.UTF8;
+        private readonly static Encoding[] _jsonTextEncodings = { Encoding.UTF8 };
+        private readonly static char _personNameComponentGroupDelimiter = '=';
+        private readonly static string[] _personNameComponentGroupNames = { "Alphabetic", "Ideographic", "Phonetic" };
 
         /// <summary>
         /// Initialize the JsonDicomConverter.
@@ -247,7 +249,7 @@ namespace FellowOakDicom.Serialization
                 case "LT":
                     if (data is IByteBuffer dataBufferLT)
                     {
-                        item = new DicomLongText(tag, _jsonTextEncoding, dataBufferLT);
+                        item = new DicomLongText(tag, _jsonTextEncodings, dataBufferLT);
                     }
                     else
                     {
@@ -304,7 +306,7 @@ namespace FellowOakDicom.Serialization
                 case "ST":
                     if (data is IByteBuffer dataBufferST)
                     {
-                        item = new DicomShortText(tag, _jsonTextEncoding, dataBufferST);
+                        item = new DicomShortText(tag, _jsonTextEncodings, dataBufferST);
                     }
                     else
                     {
@@ -332,7 +334,7 @@ namespace FellowOakDicom.Serialization
                 case "UC":
                     if (data is IByteBuffer dataBufferUC)
                     {
-                        item = new DicomUnlimitedCharacters(tag, _jsonTextEncoding, dataBufferUC);
+                        item = new DicomUnlimitedCharacters(tag, _jsonTextEncodings, dataBufferUC);
                     }
                     else
                     {
@@ -371,7 +373,7 @@ namespace FellowOakDicom.Serialization
                 case "UT":
                     if (data is IByteBuffer dataBufferUT)
                     {
-                        item = new DicomUnlimitedText(tag, _jsonTextEncoding, dataBufferUT);
+                        item = new DicomUnlimitedText(tag, _jsonTextEncodings, dataBufferUT);
                     }
                     else
                     {
@@ -653,9 +655,22 @@ namespace FellowOakDicom.Serialization
                     }
                     else
                     {
+                        var componentGroupValues = val.Split(_personNameComponentGroupDelimiter); 
+                        int i = 0;
+
                         writer.WriteStartObject();
-                        writer.WritePropertyName("Alphabetic");
-                        writer.WriteValue(val);
+                        foreach (var componentGroupValue in componentGroupValues)
+                        {
+                            // Based on standard http://dicom.nema.org/dicom/2013/output/chtml/part18/sect_F.2.html
+                            // 1. Empty values are skipped
+                            // 2. Leading componentGroups even if null need to have delimiters. Trailing componentGroup delimiter can be omitted
+                            if (!string.IsNullOrWhiteSpace(componentGroupValue))
+                            {
+                                writer.WritePropertyName(_personNameComponentGroupNames[i]);
+                                writer.WriteValue(componentGroupValue);
+                            }
+                            i++;
+                        }
                         writer.WriteEndObject();
                     }
                 }
@@ -839,11 +854,36 @@ namespace FellowOakDicom.Serialization
                     }
                     else
                     {
-                        if (item["Alphabetic"] is JToken alphabetic)
+                        // parse
+                        var componentGroupCount = 3;
+                        var componentGroupValues = new string[componentGroupCount];
+                        for (int i = 0; i < componentGroupCount; i++)
                         {
-                            if (alphabetic.Type != JTokenType.String) { throw new JsonReaderException("Malformed DICOM json"); }
-                            childStrings.Add(alphabetic.Value<string>());
+                            if (item[_personNameComponentGroupNames[i]] is JToken jToken)
+                            {
+                                if (jToken.Type != JTokenType.String) { throw new JsonReaderException("Malformed DICOM json"); }
+                                componentGroupValues[i] = jToken.Value<string>();
+                            }
                         }
+
+                        //build
+                        StringBuilder stringBuilder = new StringBuilder();
+                        for (int i = 0; i < componentGroupCount; i++)
+                        {
+                            var val = componentGroupValues[i];
+
+                            if(!string.IsNullOrWhiteSpace(val))
+                            {
+                                stringBuilder.Append(val);
+                                
+                            }
+                            stringBuilder.Append(_personNameComponentGroupDelimiter);
+                        }
+
+                        //remove optional trailing delimiters
+                        string pnVal = stringBuilder.ToString().TrimEnd(_personNameComponentGroupDelimiter);
+
+                        childStrings.Add(pnVal);
                     }
                 }
                 var data = childStrings.ToArray();

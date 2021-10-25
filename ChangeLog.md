@@ -1,4 +1,9 @@
-#### v.4.0.8 (TBD)
+#### v.4.0.9 (TBD)
+* Bug fix: Correct Source PDU Field in Association Abort Request (#984)
+* Bug fix: Correct Person Name VR Json model (#1235)
+
+
+#### v.4.0.8 (09/10/2020)
 * Add missing properties to IDicomClient interface (#1171)
 * Bug fix: No DICOM charset found for GB18030 in .NET Core (#1125)
 * Bug fix: Incorrect failed validation for Vr Type DS, both .NET Core and Framework (#1141)
@@ -9,6 +14,10 @@
 * Bug fix: Ensure timeout detection can never stop prematurely
 * Fix parsing of datasets with a final SequenceDelimiterItem at the end (#1157)
 * Fix: DicomDirectory did throw exception on calling constructor with no parameters (#1176)
+* Update to DICOM Standard 2021b (#1189)
+* Do not validate VM for VRs OF, OL and OV (#1186)
+* Add possibility to add values for the VRs UV, SV and OV
+* Bug fix: Anonymizer not parsing items in sequences (#1202)
 
 #### v.4.0.7 (11/1/2020)
 * Bug fix: Not able to open deflated dicom file which contains squence (#1097)
