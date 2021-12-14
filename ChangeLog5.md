@@ -1,4 +1,12 @@
-#### 5.0.1 (TBD)
+#### 5.0.2 (TBD)
+* Fix issue where opening a DICOM file from a stream writes too much data when saving it again (#1264)
+* Add possibility to read from streams without `Seek` like `BrowserFileStream` (#1218)
+* Add method to convert an array of DicomDatasets into a json string (#1271)
+* Improved bilinear interpolation
+* Fix issue where sending a deflated DICOM file via C-STORE was sent inflated, causing errors (#1283) 
+* Optimize performance and reduce memory allocations in network layer (#1267 and #1273)
+
+#### 5.0.1 (2021-11-11)
 
 * Add generated API documentation for versions 4 and 5
 * Fix IO Exception with >2GB images (#1148)
@@ -6,6 +14,12 @@
 * Bug fix: Correct Person Name VR Json model (#1235)
 * Vulnerability fix: Use secure version of `System.Text.Encodings.Web` package (#1223) 
 * Change: `DicomFile.Open` now throws a `DicomFileException` if the file size is less than 132 bytes (#641)
+* Add XML documentation to nuget package
+* Change: Trying to add a DICOM element with invalid group ID to DICOM meta information now throws `DicomDataException` (#750)
+* Bug fix: Prevent DicomJsonConverter from consuming root end object token (#1251)
+* Add missing handling of UV, SV and OV in DicomDatasetReaderObserver.OnElement
+* Drastically reduce memory consumption when saving a DICOM file
+* Fix rendering of single color image
 
 #### 5.0.0 (2021-09-13)
 
