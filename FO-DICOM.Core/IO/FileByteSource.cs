@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
 using System;
@@ -21,6 +22,7 @@ namespace FellowOakDicom.IO
         private readonly IFileReference _file;
 
         private readonly Stream _stream;
+        private readonly long _length;
 
         private Endian _endian;
 
@@ -47,6 +49,10 @@ namespace FellowOakDicom.IO
         {
             _file = file;
             _stream = _file.OpenRead();
+            // this is a read stream, so length won't change ... we need to 
+            // call Require all the time while parsing, so caching this 
+            // value is a huge win for large files
+            _length = _stream.Length;
             _endian = Endian.LocalMachine;
             _reader = EndianBinaryReader.Create(_stream, _endian, false);
             Marker = 0;
@@ -88,7 +94,7 @@ namespace FellowOakDicom.IO
         public long Marker { get; private set; }
 
         /// <inheritdoc />
-        public bool IsEOF => _stream.Position >= _stream.Length;
+        public bool IsEOF => _stream.Position >= _length;
 
         /// <inheritdoc />
         public bool CanRewind => _stream.CanSeek;
@@ -158,7 +164,25 @@ namespace FellowOakDicom.IO
             }
             else // count < LargeObjectSize || _readOption == FileReadOption.ReadAll
             {
-                buffer = new MemoryByteBuffer(GetBytes((int)count));
+                if (count < MemoryByteBuffer.MaxArrayLength)
+                {
+                    buffer = new MemoryByteBuffer(GetBytes((int)count));
+                }
+                else
+                {
+                    var numberOfBuffers = (int) Math.Ceiling((double) count / MemoryByteBuffer.MaxArrayLength);
+                    var buffers = new IByteBuffer[numberOfBuffers];
+                    for (var i = 0; i < numberOfBuffers - 1; i++)
+                    {
+                        var bufferData = new byte[MemoryByteBuffer.MaxArrayLength];
+                        GetBytes(bufferData, 0, bufferData.Length);
+                        buffers[i] = new MemoryByteBuffer(bufferData);
+                    }
+                    var lastBufferData = new byte[count % MemoryByteBuffer.MaxArrayLength];
+                    GetBytes(lastBufferData, 0, lastBufferData.Length);
+                    buffers[numberOfBuffers-1] = new MemoryByteBuffer(lastBufferData);
+                    buffer = new CompositeByteBuffer(buffers);
+                }
             }
             return buffer;
         }
@@ -211,7 +235,7 @@ namespace FellowOakDicom.IO
         {
             lock (_lock)
             {
-                return (_stream.Length - _stream.Position) >= count;
+                return (_length - _stream.Position) >= count;
             }
         }
 

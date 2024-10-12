@@ -1,10 +1,12 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
 using FellowOakDicom.Log;
 using FellowOakDicom.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -83,8 +85,8 @@ namespace FellowOakDicom.IO
         {
             if (readOption == FileReadOption.Default || readOption == FileReadOption.ReadLargeOnDemand)
             {
-                var logger = Setup.ServiceProvider.GetRequiredService<ILogManager>().GetLogger("FellowOakDicom.IO");
-                logger.Warn("Reading large files on demand is not possible with unseekable streams, reading all tags immediately instead.");
+                var logger = Setup.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(LogCategories.IO);
+                logger.LogWarning("Reading large files on demand is not possible with unseekable streams, reading all tags immediately instead");
                 readOption = FileReadOption.ReadAll;
             }
 

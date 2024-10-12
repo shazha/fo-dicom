@@ -1,5 +1,6 @@
-// Copyright (c) 2012-2021 fo-dicom contributors.
+// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ namespace FellowOakDicom.Imaging.Render
 {
 
     /// <summary>
-    /// The Image Graphic implementation of <seealso cref="IGraphic"/>
+    /// The Image Graphic implementation of <see cref="IGraphic"/>
     /// </summary>
     public class ImageGraphic : IGraphic
     {
@@ -100,14 +101,8 @@ namespace FellowOakDicom.Imaging.Render
         /// <inheritdoc />
         public int ZOrder
         {
-            get
-            {
-                return _zorder;
-            }
-            set
-            {
-                _zorder = value;
-            }
+            get => _zorder;
+            set => _zorder = value;
         }
 
         #endregion
@@ -115,7 +110,7 @@ namespace FellowOakDicom.Imaging.Render
         #region Public Constructors
 
         /// <summary>
-        /// Initialize new instance of <seealso cref="ImageGraphic"/>
+        /// Initialize new instance of <see cref="ImageGraphic"/>
         /// </summary>
         /// <param name="pixelData">Pixel data</param>
         public ImageGraphic(IPixelData pixelData)
@@ -195,11 +190,7 @@ namespace FellowOakDicom.Imaging.Render
                 else if (angle >= -180) _rotation -= 180;
                 else if (angle >= -270) _rotation -= 270;
             }
-            if (angle != 0)
-            {
-                if (_rotation >= 360) _rotation -= 360;
-                else if (_rotation < 0) _rotation += 360;
-            }
+            _rotation = _rotation % 360;
         }
 
         /// <inheritdoc />

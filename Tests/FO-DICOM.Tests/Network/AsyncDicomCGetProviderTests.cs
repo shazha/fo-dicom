@@ -1,22 +1,22 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using FellowOakDicom.Imaging.Codec;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
 using FellowOakDicom.Network.Client;
 using FellowOakDicom.Tests.Helpers;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace FellowOakDicom.Tests.Network
 {
-    [Collection("Network"), Trait("Category", "Network")]
+    [Collection(TestCollections.Network), Trait(TestTraits.Category, TestCategories.Network)]
     public class AsyncDicomCGetProviderTests
     {
         private readonly XUnitDicomLogger _logger;
@@ -49,8 +49,8 @@ namespace FellowOakDicom.Tests.Network
                     OnTimeout = (sender, args) => timeout = args
                 };
 
-                await client.AddRequestAsync(request).ConfigureAwait(false);
-                await client.SendAsync().ConfigureAwait(false);
+                await client.AddRequestAsync(request);
+                await client.SendAsync();
 
                 Assert.NotNull(response);
                 Assert.Equal(DicomStatus.Success, response.Status);
@@ -78,8 +78,8 @@ namespace FellowOakDicom.Tests.Network
                     OnTimeout = (sender, args) => timeout = args
                 };
 
-                await client.AddRequestAsync(request).ConfigureAwait(false);
-                await client.SendAsync().ConfigureAwait(false);
+                await client.AddRequestAsync(request);
+                await client.SendAsync();
 
                 Assert.Collection(
                     responses,
@@ -96,7 +96,7 @@ namespace FellowOakDicom.Tests.Network
 
     public class ImmediateSuccessAsyncDicomCGetProvider : DicomService, IDicomServiceProvider, IDicomCGetProvider
     {
-        public ImmediateSuccessAsyncDicomCGetProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public ImmediateSuccessAsyncDicomCGetProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies)
             : base(stream, fallbackEncoding, log, dependencies)
         {
@@ -131,6 +131,7 @@ namespace FellowOakDicom.Tests.Network
 
         public async IAsyncEnumerable<DicomCGetResponse> OnCGetRequestAsync(DicomCGetRequest request)
         {
+            await Task.Yield();
             yield return new DicomCGetResponse(request, DicomStatus.Success);
         }
 
@@ -139,7 +140,7 @@ namespace FellowOakDicom.Tests.Network
 
     public class PendingAsyncDicomCGetProvider : DicomService, IDicomServiceProvider, IDicomCGetProvider
     {
-        public PendingAsyncDicomCGetProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public PendingAsyncDicomCGetProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies)
             : base(stream, fallbackEncoding, log, dependencies)
         {
@@ -174,6 +175,7 @@ namespace FellowOakDicom.Tests.Network
 
         public async IAsyncEnumerable<DicomCGetResponse> OnCGetRequestAsync(DicomCGetRequest request)
         {
+            await Task.Yield();
             yield return new DicomCGetResponse(request, DicomStatus.Pending);
             yield return new DicomCGetResponse(request, DicomStatus.Pending);
             yield return new DicomCGetResponse(request, DicomStatus.Success);

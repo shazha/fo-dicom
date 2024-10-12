@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 
@@ -7,7 +8,7 @@ namespace FellowOakDicom.Imaging.LUT
 {
 
     /// <summary>
-    /// Abstract VOI LUT implementation of <seealso cref="ILUT"/>
+    /// Abstract VOI LUT implementation of <see cref="ILUT"/>
     /// </summary>
     public abstract class VOILUT : ILUT
     {
@@ -20,7 +21,7 @@ namespace FellowOakDicom.Imaging.LUT
         #region Public Constructors
 
         /// <summary>
-        /// Initialize new instance of <seealso cref="VOILUT"/>
+        /// Initialize new instance of <see cref="VOILUT"/>
         /// </summary>
         /// <param name="options">Render options</param>
         protected VOILUT(GrayscaleRenderOptions options)
@@ -111,7 +112,7 @@ namespace FellowOakDicom.Imaging.LUT
         #region Public Constructors
 
         /// <summary>
-        /// Initialize new instance of <seealso cref="VOILinearLUT"/>
+        /// Initialize new instance of <see cref="VOILinearLUT"/>
         /// </summary>
         /// <param name="options">Render options</param>
         public VOILinearLUT(GrayscaleRenderOptions options)
@@ -157,7 +158,7 @@ namespace FellowOakDicom.Imaging.LUT
         #region Public Constructors
 
         /// <summary>
-        /// Initialize new instance of <seealso cref="VOILinearLUT"/>
+        /// Initialize new instance of <see cref="VOILinearLUT"/>
         /// </summary>
         /// <param name="options">Render options</param>
         public VOILinearExactLUT(GrayscaleRenderOptions options)
@@ -183,7 +184,7 @@ namespace FellowOakDicom.Imaging.LUT
                     {
                         return Math.Min(MaximumOutputValue,
                             Math.Max(MinimumOutputValue,
-                            (value - WindowCenter) / WindowWidth * OutputRange + MinimumOutputValue
+                            ((value - WindowCenter) / WindowWidth + 0.5) * OutputRange + MinimumOutputValue
                             ));
                     }
                 }
@@ -202,7 +203,7 @@ namespace FellowOakDicom.Imaging.LUT
         #region Public Constructors
 
         /// <summary>
-        /// Initialize new instance of <seealso cref="VOISigmoidLUT"/>
+        /// Initialize new instance of <see cref="VOISigmoidLUT"/>
         /// </summary>
         /// <param name="options">Render options</param>
         public VOISigmoidLUT(GrayscaleRenderOptions options)

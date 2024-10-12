@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Imaging;
 using Xunit;
@@ -7,7 +8,7 @@ using Xunit;
 namespace FellowOakDicom.Tests.Imaging.Render
 {
 
-    [Collection("ImageSharp")]
+    [Collection(TestCollections.ImageSharp)]
     public class RenderingTest
     {
 
@@ -21,17 +22,25 @@ namespace FellowOakDicom.Tests.Imaging.Render
             var myDicomImage = new DicomImage(myDicomFile.Dataset);
             IImage myImg = myDicomImage.RenderImage(0);
 
-            //var image = myImg.AsSharpImage();
-            //using (var fs = new FileStream("d:\\image.png", FileMode.OpenOrCreate))
-            //{
-            //    image.Save(fs, new SixLabors.ImageSharp.Formats.Png.PngEncoder());
-            //}
-
             var col1 = myImg.GetPixel(myImg.Width / 2, myImg.Height / 2 );
 
             Assert.True(col1.R>0);
         }
 
+        [FactForNetCore]
+        public void RenderJpeg2000_YBR_RCT()
+        {
+            var myDicomFile = DicomFile.Open(TestData.Resolve("VL5_J2KI.dcm"));
+
+            myDicomFile.Dataset.AddOrUpdate(DicomTag.VOILUTFunction, "LINEAR_EXACT");
+
+            var myDicomImage = new DicomImage(myDicomFile.Dataset);
+            IImage myImg = myDicomImage.RenderImage(0);
+
+            var col1 = myImg.GetPixel(myImg.Width / 2, myImg.Height / 2);
+
+            Assert.True(col1.R > 0);
+        }
 
     }
 }

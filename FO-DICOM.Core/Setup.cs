@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Imaging;
 using FellowOakDicom.Imaging.Codec;
@@ -8,12 +9,11 @@ using FellowOakDicom.Log;
 using FellowOakDicom.Memory;
 using FellowOakDicom.Network;
 using FellowOakDicom.Network.Client;
-using FellowOakDicom.Network.Client.Advanced;
 using FellowOakDicom.Network.Client.Advanced.Connection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using System;
-using System.Linq;
 
 namespace FellowOakDicom
 {
@@ -74,10 +74,10 @@ namespace FellowOakDicom
     {
         public static IServiceCollection AddFellowOakDicom(this IServiceCollection services)
             => services
-                .AddInternals()    
+                .AddInternals()
+                .AddLogging()
                 .AddTranscoderManager<DefaultTranscoderManager>()
                 .AddImageManager<RawImageManager>()
-                .AddLogManager<ConsoleLogManager>()
                 .AddNetworkManager<DesktopNetworkManager>()
                 .AddDicomClient()
                 .AddDicomServer();
@@ -94,17 +94,27 @@ namespace FellowOakDicom
             services.TryAddSingleton<DicomServiceDependencies>();
             services.TryAddSingleton<IDicomClientFactory, DefaultDicomClientFactory>();
             services.TryAddSingleton<IAdvancedDicomClientConnectionFactory, DefaultAdvancedDicomClientConnectionFactory>();
-            services.Configure(options ?? (o => { }));
+            services.AddOptions<DicomClientOptions>();
+            services.AddOptions<DicomServiceOptions>();
+            if (options != null)
+            {
+                services.Configure(options);
+            }
             return services;
         }
 
-        public static IServiceCollection AddDicomServer(this IServiceCollection services, Action<DicomServiceOptions> options = null)
+        public static IServiceCollection AddDicomServer(this IServiceCollection services, Action<DicomServerOptions> options = null)
         {
             services.TryAddSingleton<DicomServiceDependencies>();
             services.TryAddSingleton<DicomServerDependencies>();
             services.TryAddSingleton<IDicomServerRegistry, DefaultDicomServerRegistry>();
             services.TryAddSingleton<IDicomServerFactory, DefaultDicomServerFactory>();
-            services.Configure(options ?? (o => { }));
+            services.AddOptions<DicomServerOptions>();
+            services.AddOptions<DicomServiceOptions>();
+            if (options != null)
+            {
+                services.Configure(options);
+            }
             return services;
         }
 
@@ -120,15 +130,17 @@ namespace FellowOakDicom
             return services;
         }
 
-        public static IServiceCollection AddLogManager<TLogManager>(this IServiceCollection services) where TLogManager : class, ILogManager
-        {
-            services.Replace(ServiceDescriptor.Singleton<ILogManager, TLogManager>());
-            return services;
-        }
-
         public static IServiceCollection AddNetworkManager<TNetworkManager>(this IServiceCollection services) where TNetworkManager : class, INetworkManager
         {
             services.Replace(ServiceDescriptor.Singleton<INetworkManager, TNetworkManager>());
+            return services;
+        }
+        
+        [Obsolete("Fellow Oak DICOM now supports Microsoft.Extensions.Logging")]
+        public static IServiceCollection AddLogManager<TLogManager>(this IServiceCollection services) where TLogManager : class, ILogManager
+        {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerProvider, FellowOakDicomLoggerProvider>());
+            services.Replace(ServiceDescriptor.Singleton<ILogManager, TLogManager>());
             return services;
         }
     }

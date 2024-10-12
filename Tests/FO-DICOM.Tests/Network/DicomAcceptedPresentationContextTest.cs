@@ -1,23 +1,23 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using FellowOakDicom.Imaging.Codec;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
 using FellowOakDicom.Network.Client;
 using FellowOakDicom.Printing;
 using FellowOakDicom.Tests.Helpers;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace FellowOakDicom.Tests.Network
 {
-    [Collection("Network"), Trait("Category", "Network")]
+    [Collection(TestCollections.Network), Trait(TestTraits.Category, TestCategories.Network)]
     public class DicomAcceptedPresentationContextTest
     {
         private readonly XUnitDicomLogger _logger;
@@ -129,7 +129,7 @@ namespace FellowOakDicom.Tests.Network
 
     internal class AcceptOnlyEchoProvider : SimpleAssociationAcceptProvider
     {
-        public AcceptOnlyEchoProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public AcceptOnlyEchoProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies) : base(stream, fallbackEncoding, log, dependencies)
         {
             AcceptedSopClasses.Add(DicomUID.Verification);
@@ -138,7 +138,7 @@ namespace FellowOakDicom.Tests.Network
 
     internal class AcceptOnlyEchoPrintManagementProvider : SimpleAssociationAcceptProvider
     {
-        public AcceptOnlyEchoPrintManagementProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public AcceptOnlyEchoPrintManagementProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies) : base(stream, fallbackEncoding, log, dependencies)
         {
             AcceptedSopClasses.AddRange(new[] { DicomUID.Verification, DicomUID.BasicGrayscalePrintManagementMeta });
@@ -147,7 +147,7 @@ namespace FellowOakDicom.Tests.Network
 
     internal class AcceptOnlyEchoStoreProvider : SimpleAssociationAcceptProvider
     {
-        public AcceptOnlyEchoStoreProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public AcceptOnlyEchoStoreProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies) : base(stream, fallbackEncoding, log, dependencies)
         {
             AcceptedSopClasses.Add(DicomUID.Verification);
@@ -167,7 +167,7 @@ namespace FellowOakDicom.Tests.Network
 
         protected List<DicomUID> AcceptedSopClasses { get; } = new List<DicomUID>();
 
-        public SimpleAssociationAcceptProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public SimpleAssociationAcceptProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies)
           : base(stream, fallbackEncoding, log, dependencies)
         {

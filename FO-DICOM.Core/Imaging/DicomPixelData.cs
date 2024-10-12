@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Linq;
@@ -62,7 +63,7 @@ namespace FellowOakDicom.Imaging
         }
 
         /// <summary>
-        /// Gets new instance of <seealso cref="BitDepth"/> using dataset information.
+        /// Gets new instance of <see cref="BitDepth"/> using dataset information.
         /// </summary>
         public BitDepth BitDepth => new BitDepth(
             BitsAllocated,
@@ -206,12 +207,12 @@ namespace FellowOakDicom.Imaging
         }
 
         /// <summary>
-        /// Gets palette color LUT, valid for PALETTE COLOR <seealso cref="PhotometricInterpretation"/>
+        /// Gets palette color LUT, valid for PALETTE COLOR <see cref="PhotometricInterpretation"/>
         /// </summary>
         public Color32[] PaletteColorLUT => GetPaletteColorLUT();
 
         /// <summary>
-        /// Extracts the palette color LUT from DICOM dataset, valid for PALETTE COLOR <seealso cref="PhotometricInterpretation"/>
+        /// Extracts the palette color LUT from DICOM dataset, valid for PALETTE COLOR <see cref="PhotometricInterpretation"/>
         /// </summary>
         /// <returns>Palette color LUT</returns>
         /// <exception cref="DicomImagingException">Invalid photometric interpretation or plaette color lUT missing from database</exception>
@@ -286,12 +287,12 @@ namespace FellowOakDicom.Imaging
         public abstract void AddFrame(IByteBuffer data);
 
         /// <summary>
-        /// A factory method to initialize new instance of <seealso cref="DicomPixelData"/> implementation either 
-        /// <seealso cref="OtherWordPixelData"/>, <seealso cref="OtherBytePixelData"/>, or <seealso cref="EncapsulatedPixelData"/>
+        /// A factory method to initialize new instance of <see cref="DicomPixelData"/> implementation either 
+        /// <see cref="OtherWordPixelData"/>, <see cref="OtherBytePixelData"/>, or <see cref="EncapsulatedPixelData"/>
         /// </summary>
         /// <param name="dataset">Source DICOM Dataset</param>
-        /// <param name="newPixelData">true if new <seealso cref="DicomPixelData"/>will be created for current dataset,
-        /// false to read <seealso cref="DicomPixelData"/> from <paramref name="dataset"/>.
+        /// <param name="newPixelData">true if new <see cref="DicomPixelData"/>will be created for current dataset,
+        /// false to read <see cref="DicomPixelData"/> from <paramref name="dataset"/>.
         /// Default is false (read)</param>
         /// <returns>New instance of DicomPixelData</returns>
         public static DicomPixelData Create(DicomDataset dataset, bool newPixelData = false)
@@ -349,7 +350,7 @@ namespace FellowOakDicom.Imaging
         }
 
         /// <summary>
-        /// Other Byte (OB) implementation of <seealso cref="DicomPixelData"/>
+        /// Other Byte (OB) implementation of <see cref="DicomPixelData"/>
         /// </summary>
         private sealed class OtherBytePixelData : DicomPixelData
         {
@@ -359,6 +360,7 @@ namespace FellowOakDicom.Imaging
             /// The pixel data other byte (OB) element
             /// </summary>
             private readonly DicomOtherByte _element;
+            private readonly IByteBuffer _paddingByteBuffer = new MemoryByteBuffer(new byte[1] { DicomVR.OB.PaddingValue });
 
             #endregion
 
@@ -406,7 +408,12 @@ namespace FellowOakDicom.Imaging
                 var buffer = _element.Buffer as CompositeByteBuffer ??
                     throw new DicomImagingException("Expected pixel data element to have a CompositeByteBuffer");
 
+                buffer.Buffers.Remove(_paddingByteBuffer);
                 buffer.Buffers.Add(data);
+                if (buffer.Size % 2 == 1)
+                {
+                    buffer.Buffers.Add(_paddingByteBuffer);
+                }
 
                 NumberOfFrames++;
             }
@@ -415,7 +422,7 @@ namespace FellowOakDicom.Imaging
         }
 
         /// <summary>
-        /// Other Word (OW) implementation of <seealso cref="DicomPixelData"/>
+        /// Other Word (OW) implementation of <see cref="DicomPixelData"/>
         /// </summary>
         private sealed class OtherWordPixelData : DicomPixelData
         {
@@ -425,6 +432,7 @@ namespace FellowOakDicom.Imaging
             /// The pixel data other word (OW) element
             /// </summary>
             private readonly DicomOtherWord _element;
+            private readonly IByteBuffer _paddingByteBuffer = new MemoryByteBuffer(new byte[1] { DicomVR.OW.PaddingValue });
 
             #endregion
 
@@ -482,7 +490,13 @@ namespace FellowOakDicom.Imaging
                     data = new SwapByteBuffer(data, 2);
                 }
 
+                buffer.Buffers.Remove(_paddingByteBuffer);
                 buffer.Buffers.Add(data);
+                if (buffer.Size % 2 == 1)
+                {
+                    buffer.Buffers.Add(_paddingByteBuffer);
+                }
+
                 NumberOfFrames++;
             }
 
@@ -490,7 +504,7 @@ namespace FellowOakDicom.Imaging
         }
 
         /// <summary>
-        /// Other Byte/Word Fragment implementation of <seealso cref="DicomPixelData"/>, used for handling encapsulated (compressed)
+        /// Other Byte/Word Fragment implementation of <see cref="DicomPixelData"/>, used for handling encapsulated (compressed)
         /// pixel data
         /// </summary>
         private sealed class EncapsulatedPixelData : DicomPixelData
@@ -547,15 +561,23 @@ namespace FellowOakDicom.Imaging
 
                 IByteBuffer buffer;
 
+                var fragments = _element.Fragments;
+                
+                // GH-1586 Ignore last fragment if it is empty
+                if (fragments.Count > 0 && fragments[fragments.Count - 1].Size == 0)
+                {
+                    fragments.RemoveAt(fragments.Count - 1);
+                }
+                
                 if (NumberOfFrames == 1)
                 {
-                    buffer = _element.Fragments.Count == 1
-                        ? _element.Fragments[0]
-                        : new CompositeByteBuffer(_element.Fragments);
+                    buffer = fragments.Count == 1
+                        ? fragments[0]
+                        : new CompositeByteBuffer(fragments);
                 }
-                else if (_element.Fragments.Count == NumberOfFrames)
+                else if (fragments.Count == NumberOfFrames)
                 {
-                    buffer = _element.Fragments[frame];
+                    buffer = fragments[frame];
                 }
                 else if (_element.OffsetTable.Count == NumberOfFrames)
                 {
@@ -569,10 +591,10 @@ namespace FellowOakDicom.Imaging
                     long pos = 0;
                     var frag = 0;
 
-                    while (pos < start && frag < _element.Fragments.Count)
+                    while (pos < start && frag < fragments.Count)
                     {
                         pos += 8;
-                        pos += _element.Fragments[frag].Size;
+                        pos += fragments[frag].Size;
                         frag++;
                     }
 
@@ -581,12 +603,12 @@ namespace FellowOakDicom.Imaging
                         throw new DicomImagingException("Fragment start position does not match offset table.");
                     }
 
-                    while (pos < stop && frag < _element.Fragments.Count)
+                    while (pos < stop && frag < fragments.Count)
                     {
-                        composite.Buffers.Add(_element.Fragments[frag]);
+                        composite.Buffers.Add(fragments[frag]);
 
                         pos += 8;
-                        pos += _element.Fragments[frag].Size;
+                        pos += fragments[frag].Size;
                         frag++;
                     }
 

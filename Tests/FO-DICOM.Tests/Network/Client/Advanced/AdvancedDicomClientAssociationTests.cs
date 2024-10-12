@@ -1,25 +1,23 @@
-﻿// Copyright (c) 2012-2022 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using FellowOakDicom.Imaging.Codec;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
-using FellowOakDicom.Network.Client.Advanced;
 using FellowOakDicom.Network.Client.Advanced.Association;
 using FellowOakDicom.Network.Client.Advanced.Connection;
 using FellowOakDicom.Tests.Helpers;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace FellowOakDicom.Tests.Network.Client.Advanced
 {
-    [Collection("Network"), Trait("Category", "Network")]
+    [Collection(TestCollections.Network), Trait(TestTraits.Category, TestCategories.Network)]
     public class AdvancedDicomClientAssociationTests
     {
         #region Fields
@@ -378,7 +376,7 @@ namespace FellowOakDicom.Tests.Network.Client.Advanced
             using var association = await connection.OpenAssociationAsync(openAssociationRequest, cancellationToken);
             try
             {
-                cEchoResponse = await association.SendCEchoRequestAsync(cEchoRequest, cancellationToken).ConfigureAwait(false);
+                cEchoResponse = await association.SendCEchoRequestAsync(cEchoRequest, cancellationToken);
             }
             finally
             {
@@ -557,7 +555,7 @@ namespace FellowOakDicom.Tests.Network.Client.Advanced
 
         public class MockCEchoProvider : DicomService, IDicomServiceProvider, IDicomCEchoProvider
         {
-            public MockCEchoProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+            public MockCEchoProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
                 DicomServiceDependencies dependencies)
                 : base(stream, fallbackEncoding, log, dependencies)
             {

@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System.IO;
 using System.Runtime.Serialization;
@@ -25,32 +26,6 @@ namespace FellowOakDicom.Tests.Helpers
             using var stream = new MemoryStream(Encoding.Unicode.GetBytes(builder.ToString()));
             deserializedObject = (T)serializer.ReadObject(stream);
             return deserializedObject;
-        }
-
-        public static T GetBinaryFormatterDeserializedObject<T>(this T input)
-        {
-            T deserialized;
-            var formatter = new BinaryFormatter();
-            var tempFileName = Path.GetTempFileName();
-            try
-            {
-                using var write = File.OpenWrite(tempFileName);
-                formatter.Serialize(write, input);
-                write.Close();
-                using var read = File.OpenRead(tempFileName);
-                deserialized = (T)formatter.Deserialize(read);
-            }
-            finally
-            {
-                try
-                {
-                    File.Delete(tempFileName);
-                }
-                catch
-                {
-                }
-            }
-            return deserialized;
         }
     }
 }

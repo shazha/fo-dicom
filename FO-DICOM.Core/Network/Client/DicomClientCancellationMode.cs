@@ -1,5 +1,6 @@
-// Copyright (c) 2012-2021 fo-dicom contributors.
+// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 namespace FellowOakDicom.Network.Client
 {
@@ -10,7 +11,7 @@ namespace FellowOakDicom.Network.Client
     {
         /// <summary>
         /// Upon cancellation, stop sending requests, immediately gracefully release the association and close the connection. Pending requests may or may not complete.
-        /// This cancellation mode will NOT wait for pending requests to complete, but will respect the <see cref="DicomClient.AssociationReleaseTimeoutInMs"/> timeout.
+        /// This cancellation mode will NOT wait for pending requests to complete, but will respect the <see cref="DicomClientOptions.AssociationReleaseTimeoutInMs"/> timeout.
         /// </summary>
         ImmediatelyReleaseAssociation,
 

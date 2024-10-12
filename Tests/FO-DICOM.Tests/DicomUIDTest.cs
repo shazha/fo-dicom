@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +9,7 @@ using Xunit;
 namespace FellowOakDicom.Tests
 {
 
-    [Collection("General")]
+    [Collection(TestCollections.General)]
     public class DicomUIDTest
     {
         #region Fields
@@ -153,7 +154,7 @@ namespace FellowOakDicom.Tests
             Assert.Equal(DicomStorageCategory.Raw, DicomUID.RawDataStorage.StorageCategory);
             Assert.Equal(DicomStorageCategory.Image, DicomUID.DigitalXRayImageStorageForProcessing.StorageCategory);
             Assert.Equal(DicomStorageCategory.Volume, DicomUID.EnhancedUSVolumeStorage.StorageCategory);
-            Assert.Equal(DicomStorageCategory.None, DicomUID.VolumeMeasurements7472.StorageCategory);
+            Assert.Equal(DicomStorageCategory.None, DicomUID.VolumeMeasurement7472.StorageCategory);
         }
 
         #endregion
@@ -173,7 +174,7 @@ namespace FellowOakDicom.Tests
                 yield return new object[] { DicomUID.UltrasoundTransducerGeometry12033, DicomUidType.ContextGroupName, false };
                 yield return new object[] { DicomUID.ExplicitVRBigEndianRETIRED, DicomUidType.TransferSyntax, true };
                 yield return new object[] { DicomUID.JPEGFullProgressionHierarchical2426RETIRED, DicomUidType.TransferSyntax, true };
-                yield return new object[] { DicomUID.IEC61217PatientSupportPositionParameters9403, DicomUidType.ContextGroupName, false };   // 2015c
+                yield return new object[] { DicomUID.IEC61217PatientSupportPositionParameter9403, DicomUidType.ContextGroupName, false };   // 2015c
             }
         }
         #endregion

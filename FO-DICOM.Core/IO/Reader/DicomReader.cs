@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Imaging.Mathematics;
 using FellowOakDicom.IO.Buffer;
@@ -1114,6 +1115,17 @@ namespace FellowOakDicom.IO.Reader
                     {
                         return;
                     }
+                    
+                    /*
+                     * #1339
+                     * Edge case: usually fragment sequences are ended with a SequenceDelimitationItem
+                     * but sometimes this is missing.
+                     * If this is the end of the DICOM file anyway, it is safe to end the fragment sequence
+                     */
+                    if (source.IsEOF)
+                    {
+                        _observer.OnEndFragmentSequence();
+                    }
                 }
             }
 
@@ -1130,6 +1142,17 @@ namespace FellowOakDicom.IO.Reader
                     if (!await ParseFragmentSequenceValueAsync(source).ConfigureAwait(false))
                     {
                         return;
+                    }
+                    
+                    /*
+                     * #1339
+                     * Edge case: usually fragment sequences are ended with a SequenceDelimitationItem
+                     * but sometimes this is missing.
+                     * If this is the end of the DICOM file anyway, it is safe to end the fragment sequence
+                     */
+                    if (source.IsEOF)
+                    {
+                        _observer.OnEndFragmentSequence();
                     }
                 }
             }

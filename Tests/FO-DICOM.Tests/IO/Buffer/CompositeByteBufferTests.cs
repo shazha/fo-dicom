@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
+// Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
+
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -8,7 +12,7 @@ using Xunit;
 
 namespace FellowOakDicom.Tests.IO.Buffer
 {
-    [Collection("General")]
+    [Collection(TestCollections.General)]
     public class CompositeByteBufferTest
     {
         #region Unit tests

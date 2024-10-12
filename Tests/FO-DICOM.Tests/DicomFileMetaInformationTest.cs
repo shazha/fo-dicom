@@ -1,14 +1,18 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
+// These tests cover some obsolete properties such as AutoValidate
+#pragma warning disable CS0618
+
 namespace FellowOakDicom.Tests
 {
 
-    [Collection("Validation")]
+    [Collection(TestCollections.Validation)]
     public class DicomFileMetaInformationTest
     {
         #region Unit tests
@@ -64,7 +68,7 @@ namespace FellowOakDicom.Tests
                         new DicomUniqueIdentifier(DicomTag.SOPInstanceUID, "1.2.3"))
                         .Add(DicomTag.SourceApplicationEntityTitle, "ABCDEFG"));
 
-            var exception = Record.Exception(() => { Assert.Equal(metaInfo.SourceApplicationEntityTitle, "ABCDEFG"); });
+            var exception = Record.Exception(() => { Assert.Equal("ABCDEFG", metaInfo.SourceApplicationEntityTitle); });
             Assert.Null(exception);
         }
 

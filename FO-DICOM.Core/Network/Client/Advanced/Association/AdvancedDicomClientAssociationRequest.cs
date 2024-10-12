@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 namespace FellowOakDicom.Network.Client.Advanced.Association
 {
@@ -37,6 +38,11 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
         /// Gets the (common) extended negotiations
         /// </summary>
         public DicomExtendedNegotiationCollection ExtendedNegotiations { get; }
+
+        /// <summary>
+        /// Gets or sets the user identity negotiation information
+        /// </summary>
+        public DicomUserIdentityNegotiation UserIdentityNegotiation { get; set; }
 
         public AdvancedDicomClientAssociationRequest()
         {

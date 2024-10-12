@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -184,7 +185,7 @@ namespace FellowOakDicom.IO.Buffer
             
             foreach (var buffer in Buffers)
             {
-                await buffer.CopyToStreamAsync(stream, cancellationToken);
+                await buffer.CopyToStreamAsync(stream, cancellationToken).ConfigureAwait(false);
             }
         }
 

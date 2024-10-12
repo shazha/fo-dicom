@@ -1,5 +1,6 @@
-// Copyright (c) 2012-2021 fo-dicom contributors.
+// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Imaging.LUT;
 
@@ -105,7 +106,7 @@ namespace FellowOakDicom.Imaging.Render
         void Transform(double scale, int rotation, bool flipx, bool flipy);
 
         /// <summary>
-        /// Render the image and return the result as <seealso cref="IImage"/>
+        /// Render the image and return the result as <see cref="IImage"/>
         /// </summary>
         /// <param name="lut">The image LUT </param>
         /// <returns>Image after applying LUT and transformation</returns>

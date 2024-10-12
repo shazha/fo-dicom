@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
 using System;
@@ -111,7 +112,7 @@ namespace FellowOakDicom.Serialization
     }
 
     /// <summary>
-    /// Converts a DicomDataset object to and from JSON using the NewtonSoft Json.NET library
+    /// Converts a DicomDataset object to and from JSON using the System.Text.Json library
     /// </summary>
     public class DicomJsonConverter : JsonConverter<DicomDataset>
     {
@@ -140,6 +141,20 @@ namespace FellowOakDicom.Serialization
             _autoValidate = autoValidate;
             _numberSerializationMode = numberSerializationMode;
         }
+
+        /// <summary>
+        /// With his option enabled, Dicom tag keyword will be written as a
+        /// distinct Json attribute. 
+        /// Note! This is non-standard and may break parsers!
+        /// </summary>
+        public bool WriteKeyword { get; set; } = false;
+
+        /// <summary>
+        /// With his option enabled, Dicom tag name will be written as a
+        /// distinct Json attribute. 
+        /// Note! This is non-standard and may break parsers!
+        /// </summary>
+        public bool WriteName { get; set; } = false;
 
         #region JsonConverter overrides
 
@@ -232,7 +247,9 @@ namespace FellowOakDicom.Serialization
 
                     if (dataset.Contains(privateCreatorTag))
                     {
-                        item.Tag.PrivateCreator = new DicomPrivateCreator(dataset.GetSingleValue<string>(privateCreatorTag));
+                        var privateCreatorItem = dataset.GetDicomItem<DicomElement>(privateCreatorTag);
+
+                        item.Tag.PrivateCreator = new DicomPrivateCreator(privateCreatorItem.Get<string>());
                     }
                 }
             }
@@ -257,7 +274,7 @@ namespace FellowOakDicom.Serialization
         /// <summary>
         /// Create an instance of a IBulkDataUriByteBuffer. Override this method to use a different IBulkDataUriByteBuffer implementation in applications.
         /// </summary>
-        /// <param name="bulkDataUri">The URI of a bulk data element as defined in <see cref="!:http://dicom.nema.org/medical/dicom/current/output/chtml/part19/chapter_A.html#table_A.1.5-2">Table A.1.5-2 in PS3.19</see>.</param>
+        /// <param name="bulkDataUri">The URI of a bulk data element as defined in <a href="http://dicom.nema.org/medical/dicom/current/output/chtml/part19/chapter_A.html#table_A.1.5-2">Table A.1.5-2 in PS3.19</a>.</param>
         /// <returns>An instance of a Bulk URI Byte buffer.</returns>
         protected virtual IBulkDataUriByteBuffer CreateBulkDataUriByteBuffer(string bulkDataUri) => new BulkDataUriByteBuffer(bulkDataUri);
 
@@ -415,6 +432,21 @@ namespace FellowOakDicom.Serialization
                     break;
             }
 
+            if (WriteKeyword || WriteName)
+            {
+                var unknown = item.Tag.DictionaryEntry == null
+                              || string.IsNullOrWhiteSpace(item.Tag.DictionaryEntry.Keyword)
+                              || (item.Tag.DictionaryEntry.MaskTag != null && item.Tag.DictionaryEntry.MaskTag.Mask != 0xffffffff);
+
+                if (!unknown)
+                {
+                    if (WriteKeyword)
+                        writer.WriteString("keyword", item.Tag.DictionaryEntry.Keyword);
+                    if (WriteName)
+                        writer.WriteString("name", item.Tag.DictionaryEntry.Name);
+                }
+            }
+
             writer.WriteEndObject();
         }
 
@@ -433,7 +465,7 @@ namespace FellowOakDicom.Serialization
                 {
                     numberWriterAction();
                 }
-                catch (FormatException)
+                catch (Exception ex) when (ex is FormatException || ex is OverflowException)
                 {
                     if (_numberSerializationMode == NumberSerializationMode.PreferablyAsNumber)
                     {
@@ -580,9 +612,17 @@ namespace FellowOakDicom.Serialization
                     {
                         writer.WriteNullValue();
                     }
-                    else if (val is float f && float.IsNaN(f))
+                    else if ((val is float f && float.IsNaN(f)) || (val is double d && double.IsNaN(d)))
                     {
                         writer.WriteStringValue("NaN");
+                    }
+                    else if ((val is double dp && double.IsPositiveInfinity(dp)) || (val is float fp && float.IsPositiveInfinity(fp)))
+                    {
+                        writer.WriteStringValue("Infinity");
+                    }
+                    else if ((val is double dn && double.IsNegativeInfinity(dn)) || (val is float fn && float.IsNegativeInfinity(fn)))
+                    {
+                        writer.WriteStringValue("-Infinity");
                     }
                     else
                     {
@@ -618,9 +658,7 @@ namespace FellowOakDicom.Serialization
             else if (elem.Count != 0)
             {
                 writer.WritePropertyName("InlineBinary");
-                writer.WriteStartArray();
                 writer.WriteBase64StringValue(elem.Buffer.Data);
-                writer.WriteEndArray();
             }
         }
 
@@ -703,6 +741,8 @@ namespace FellowOakDicom.Serialization
             }
             else
             {
+                // Find the value of the VR property on a copy of the reader.
+                // This preserves the current location of the reader
                 vr = FindValue(reader, "vr", "none");
             }
 
@@ -780,23 +820,17 @@ namespace FellowOakDicom.Serialization
             {
                 return Array.Empty<string>();
             }
-            string propertyname = ReadPropertyName(ref reader);
 
-            if (propertyname == "Value")
+            switch (MoveToProperty(ref reader, "Value", "BulkDataURI"))
             {
-                return ReadJsonMultiStringValue(ref reader);
-            }
-            else if (propertyname == "BulkDataURI")
-            {
-                // JToken bulk
-                return ReadJsonBulkDataUri(ref reader);
-            }
-            else
-            {
-                return Array.Empty<string>();
+                case "Value":
+                    return ReadJsonMultiStringValue(ref reader);
+                case "BulkDataURI":
+                    return ReadJsonBulkDataUri(ref reader);
+                default:
+                    return Array.Empty<string>();
             }
         }
-
 
         private static string ReadPropertyName(ref Utf8JsonReader reader)
         {
@@ -845,19 +879,15 @@ namespace FellowOakDicom.Serialization
             {
                 return Array.Empty<T>();
             }
-            string propertyname = ReadPropertyName(ref reader);
 
-            if (propertyname == "Value")
+            switch (MoveToProperty(ref reader, "Value", "BulkDataURI"))
             {
-                return ReadJsonMultiNumberOrStringValue<T>(ref reader, getValue, tryParse);
-            }
-            else if (propertyname == "BulkDataURI")
-            {
-                return ReadJsonBulkDataUri(ref reader);
-            }
-            else
-            {
-                return Array.Empty<T>();
+                case "Value":
+                    return ReadJsonMultiNumberOrStringValue<T>(ref reader, getValue, tryParse);
+                case "BulkDataURI":
+                    return ReadJsonBulkDataUri(ref reader);
+                default:
+                    return Array.Empty<T>();
             }
         }
 
@@ -879,7 +909,36 @@ namespace FellowOakDicom.Serialization
                 }
                 else if (reader.TokenType == JsonTokenType.String && reader.GetString() == "NaN")
                 {
-                    childValues.Add((T)(float.NaN as object));
+                    if (typeof(T) == typeof(double))
+                    {
+                        childValues.Add((T)(double.NaN as object));
+                    }
+                    else
+                    {
+                        childValues.Add((T)(float.NaN as object));
+                    }
+                }
+                else if (reader.TokenType == JsonTokenType.String && reader.GetString() == "Infinity")
+                {
+                    if (typeof(T) == typeof(double))
+                    {
+                        childValues.Add((T)(double.PositiveInfinity as object));
+                    }
+                    else
+                    {
+                        childValues.Add((T)(float.PositiveInfinity as object));
+                    }
+                }
+                else if (reader.TokenType == JsonTokenType.String && reader.GetString() == "-Infinity")
+                {
+                    if (typeof(T) == typeof(double))
+                    {
+                        childValues.Add((T)(double.NegativeInfinity as object));
+                    }
+                    else
+                    {
+                        childValues.Add((T)(float.NegativeInfinity as object));
+                    }
                 }
                 else if (reader.TokenType == JsonTokenType.String && tryParse(reader.GetString(), out T parsed))
                 {
@@ -903,19 +962,15 @@ namespace FellowOakDicom.Serialization
             {
                 return Array.Empty<T>();
             }
-            string propertyname = ReadPropertyName(ref reader);
 
-            if (propertyname == "Value")
+            switch (MoveToProperty(ref reader, "Value", "BulkDataURI"))
             {
-                return ReadJsonMultiNumberValue<T>(ref reader, getValue);
-            }
-            else if (propertyname == "BulkDataURI")
-            {
-                return ReadJsonBulkDataUri(ref reader);
-            }
-            else
-            {
-                return Array.Empty<T>();
+                case "Value":
+                    return ReadJsonMultiNumberValue<T>(ref reader, getValue);
+                case "BulkDataURI":
+                    return ReadJsonBulkDataUri(ref reader);
+                default:
+                    return Array.Empty<T>();
             }
         }
 
@@ -938,7 +993,36 @@ namespace FellowOakDicom.Serialization
                 }
                 else if (reader.TokenType == JsonTokenType.String && reader.GetString() == "NaN")
                 {
-                    childValues.Add((T)(float.NaN as object));
+                    if (typeof(T) == typeof(double))
+                    {
+                        childValues.Add((T)(double.NaN as object));
+                    }
+                    else
+                    {
+                        childValues.Add((T)(float.NaN as object));
+                    }
+                }
+                else if (reader.TokenType == JsonTokenType.String && reader.GetString() == "Infinity")
+                {
+                    if (typeof(T) == typeof(double))
+                    {
+                        childValues.Add((T)(double.PositiveInfinity as object));
+                    }
+                    else
+                    {
+                        childValues.Add((T)(float.PositiveInfinity as object));
+                    }
+                }
+                else if (reader.TokenType == JsonTokenType.String && reader.GetString() == "-Infinity")
+                {
+                    if (typeof(T) == typeof(double))
+                    {
+                        childValues.Add((T)(double.NegativeInfinity as object));
+                    }
+                    else
+                    {
+                        childValues.Add((T)(float.NegativeInfinity as object));
+                    }
                 }
                 else
                 {
@@ -959,92 +1043,90 @@ namespace FellowOakDicom.Serialization
             {
                 return Array.Empty<string>();
             }
-            var propertyName = ReadPropertyName(ref reader);
 
-            if (propertyName == "Value")
+            switch (MoveToProperty(ref reader, "Value"))
             {
-                if (reader.TokenType == JsonTokenType.Null)
-                {
-                    reader.Read();
-                    return Array.Empty<string>();
-                }
-                else
-                {
-                    reader.AssumeAndSkip(JsonTokenType.StartArray);
-
-                    var childStrings = new List<string>();
-                    while (reader.TokenType != JsonTokenType.EndArray)
+                case "Value":
+                    if (reader.TokenType == JsonTokenType.Null)
                     {
-                        if (reader.TokenType == JsonTokenType.Null)
-                        {
-                            reader.Read();
-                            childStrings.Add(null);
-                        }
-                        else if (reader.TokenType == JsonTokenType.StartObject)
-                        {
-                            // parse
-                            reader.Read(); // read into object
-                            var componentGroupCount = 3;
-                            var componentGroupValues = new string[componentGroupCount];
-                            while (reader.TokenType != JsonTokenType.EndObject)
-                            {
-                                if (reader.TokenType == JsonTokenType.PropertyName
-                                    && reader.GetString() == "Alphabetic")
-                                {
-                                    reader.Read(); // skip propertyname
-                                    componentGroupValues[0] = reader.GetString(); // read value
-                                }
-                                else if (reader.TokenType == JsonTokenType.PropertyName
-                                    && reader.GetString() == "Ideographic")
-                                {
-                                    reader.Read(); // skip propertyname
-                                    componentGroupValues[1] = reader.GetString(); // read value
-                                }
-                                else if (reader.TokenType == JsonTokenType.PropertyName
-                                    && reader.GetString() == "Phonetic")
-                                {
-                                    reader.Read(); // skip propertyname
-                                    componentGroupValues[2] = reader.GetString(); // read value
-                                }
-                                reader.Read();
-                            }
-
-                            //build
-                            StringBuilder stringBuilder = new StringBuilder();
-                            for (int i = 0; i < componentGroupCount; i++)
-                            {
-                                var val = componentGroupValues[i];
-
-                                if (!string.IsNullOrWhiteSpace(val))
-                                {
-                                    stringBuilder.Append(val);
-
-                                }
-                                stringBuilder.Append(_personNameComponentGroupDelimiter);
-                            }
-
-                            //remove optional trailing delimiters
-                            string pnVal = stringBuilder.ToString().TrimEnd(_personNameComponentGroupDelimiter);
-
-                            childStrings.Add(pnVal); // add value
-                            reader.AssumeAndSkip(JsonTokenType.EndObject);
-                        }
-                        else
-                        {
-                            // TODO: invalid. handle this?
-                        }
+                        reader.Read();
+                        return Array.Empty<string>();
                     }
-                    reader.AssumeAndSkip(JsonTokenType.EndArray);
-                    var data = childStrings.ToArray();
-                    return data;
-                }
-            }
-            else
-            {
-                throw new JsonException("Malformed DICOM json, property 'Value' expected");
+                    else
+                    {
+                        reader.AssumeAndSkip(JsonTokenType.StartArray);
+
+                        var childStrings = new List<string>();
+                        while (reader.TokenType != JsonTokenType.EndArray)
+                        {
+                            if (reader.TokenType == JsonTokenType.Null)
+                            {
+                                reader.Read();
+                                childStrings.Add(null);
+                            }
+                            else if (reader.TokenType == JsonTokenType.StartObject)
+                            {
+                                // parse
+                                reader.Read(); // read into object
+                                var componentGroupCount = 3;
+                                var componentGroupValues = new string[componentGroupCount];
+                                while (reader.TokenType != JsonTokenType.EndObject)
+                                {
+                                    if (reader.TokenType == JsonTokenType.PropertyName
+                                        && reader.GetString() == "Alphabetic")
+                                    {
+                                        reader.Read(); // skip propertyname
+                                        componentGroupValues[0] = reader.GetString(); // read value
+                                    }
+                                    else if (reader.TokenType == JsonTokenType.PropertyName
+                                        && reader.GetString() == "Ideographic")
+                                    {
+                                        reader.Read(); // skip propertyname
+                                        componentGroupValues[1] = reader.GetString(); // read value
+                                    }
+                                    else if (reader.TokenType == JsonTokenType.PropertyName
+                                        && reader.GetString() == "Phonetic")
+                                    {
+                                        reader.Read(); // skip propertyname
+                                        componentGroupValues[2] = reader.GetString(); // read value
+                                    }
+                                    reader.Read();
+                                }
+
+                                //build
+                                StringBuilder stringBuilder = new StringBuilder();
+                                for (int i = 0; i < componentGroupCount; i++)
+                                {
+                                    var val = componentGroupValues[i];
+
+                                    if (!string.IsNullOrWhiteSpace(val))
+                                    {
+                                        stringBuilder.Append(val);
+
+                                    }
+                                    stringBuilder.Append(_personNameComponentGroupDelimiter);
+                                }
+
+                                //remove optional trailing delimiters
+                                string pnVal = stringBuilder.ToString().TrimEnd(_personNameComponentGroupDelimiter);
+
+                                childStrings.Add(pnVal); // add value
+                                reader.AssumeAndSkip(JsonTokenType.EndObject);
+                            }
+                            else
+                            {
+                                // TODO: invalid. handle this?
+                            }
+                        }
+                        reader.AssumeAndSkip(JsonTokenType.EndArray);
+                        var data = childStrings.ToArray();
+                        return data;
+                    }
+
+                default:
+                    return Array.Empty<string>();
             }
         }
-
 
         private DicomDataset[] ReadJsonSequence(ref Utf8JsonReader reader)
         {
@@ -1052,36 +1134,35 @@ namespace FellowOakDicom.Serialization
             {
                 return Array.Empty<DicomDataset>();
             }
-            var propertyName = ReadPropertyName(ref reader);
 
-            if (propertyName == "Value")
+            switch (MoveToProperty(ref reader, "Value"))
             {
-                reader.AssumeAndSkip(JsonTokenType.StartArray);
-                var childItems = new List<DicomDataset>();
-                while (reader.TokenType != JsonTokenType.EndArray)
-                {
-                    if (reader.TokenType == JsonTokenType.Null)
+                case "Value":
+                    reader.AssumeAndSkip(JsonTokenType.StartArray);
+                    var childItems = new List<DicomDataset>();
+                    while (reader.TokenType != JsonTokenType.EndArray)
                     {
-                        reader.Read();
-                        childItems.Add(null);
+                        if (reader.TokenType == JsonTokenType.Null)
+                        {
+                            reader.Read();
+                            childItems.Add(null);
+                        }
+                        else if (reader.TokenType == JsonTokenType.StartObject)
+                        {
+                            childItems.Add(ReadJsonDataset(ref reader));
+                            reader.AssumeAndSkip(JsonTokenType.EndObject);
+                        }
+                        else
+                        {
+                            throw new JsonException("Malformed DICOM json, object expected");
+                        }
                     }
-                    else if (reader.TokenType == JsonTokenType.StartObject)
-                    {
-                        childItems.Add(ReadJsonDataset(ref reader));
-                        reader.AssumeAndSkip(JsonTokenType.EndObject);
-                    }
-                    else
-                    {
-                        throw new JsonException("Malformed DICOM json, object expected");
-                    }
-                }
-                reader.AssumeAndSkip(JsonTokenType.EndArray);
-                var data = childItems.ToArray();
-                return data;
-            }
-            else
-            {
-                return Array.Empty<DicomDataset>();
+                    reader.AssumeAndSkip(JsonTokenType.EndArray);
+                    var data = childItems.ToArray();
+                    return data;
+
+                default:
+                    return Array.Empty<DicomDataset>();
             }
         }
 
@@ -1092,30 +1173,42 @@ namespace FellowOakDicom.Serialization
             {
                 return EmptyBuffer.Value;
             }
-            var propertyName = ReadPropertyName(ref reader);
 
-            if (propertyName == "InlineBinary")
+            switch (MoveToProperty(ref reader, "InlineBinary", "BulkDataURI"))
             {
-                return ReadJsonInlineBinary(ref reader);
+                case "InlineBinary":
+                    return ReadJsonInlineBinary(ref reader);
+                case "BulkDataURI":
+                    return ReadJsonBulkDataUri(ref reader);
+                default:
+                    return EmptyBuffer.Value;
             }
-            else if (propertyName == "BulkDataURI")
-            {
-                return ReadJsonBulkDataUri(ref reader);
-            }
-            return EmptyBuffer.Value;
         }
 
 
-        private static IByteBuffer ReadJsonInlineBinary(ref Utf8JsonReader reader)
+        private static IByteBuffer ReadJsonInlineBinary(ref Utf8JsonReader reader) 
+            => reader.TokenType == JsonTokenType.StartArray
+                ? ReadJsonInlineBinaryArray(ref reader)
+                : ReadJsonInlineBinaryString(ref reader);
+
+        private static IByteBuffer ReadJsonInlineBinaryArray(ref Utf8JsonReader reader)
         {
-            reader.AssumeAndSkip(JsonTokenType.StartArray);
-            if (reader.TokenType != JsonTokenType.String) { throw new JsonException("Malformed DICOM json. string expected"); }
+            reader.Read(); // caller already checked for StartArray
+            var data = ReadJsonInlineBinaryString(ref reader);
+            reader.AssumeAndSkip(JsonTokenType.EndArray);
+            return data;            
+        }
+
+        private static IByteBuffer ReadJsonInlineBinaryString(ref Utf8JsonReader reader)
+        {
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException("Malformed DICOM json. string expected");
+            }
             var data = new MemoryByteBuffer(reader.GetBytesFromBase64());
             reader.Read();
-            reader.AssumeAndSkip(JsonTokenType.EndArray);
             return data;
         }
-
 
         private IBulkDataUriByteBuffer ReadJsonBulkDataUri(ref Utf8JsonReader reader)
         {
@@ -1128,6 +1221,43 @@ namespace FellowOakDicom.Serialization
 
         #endregion
 
+        /// <summary>
+        /// Move the reader to the first occurance of any of the specified properties
+        /// in the current Json object
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="properties"></param>
+        /// <returns>
+        /// The name of the property moved to, 
+        /// or null if no such property exists
+        /// </returns>
+        private static string MoveToProperty(ref Utf8JsonReader reader, params string[] properties)
+        {
+            while (reader.TokenType != JsonTokenType.EndObject)
+            {
+                string propertyname = ReadPropertyName(ref reader);
+                if (properties.Contains(propertyname))
+                {
+                    // This property is one of the requested
+                    return propertyname;
+                }
+
+                // Move to next property
+                var currentDepth = reader.CurrentDepth;
+                while (reader.CurrentDepth >= currentDepth && reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.PropertyName
+                        && reader.CurrentDepth == currentDepth)
+                    {
+                        // We have found the next property in the same object
+                        break;
+                    }
+                }
+            }
+
+            reader.Assume(JsonTokenType.EndObject);
+            return null;
+        }
 
         private string FindValue(Utf8JsonReader reader, string property, string defaultValue)
         {
@@ -1162,7 +1292,6 @@ namespace FellowOakDicom.Serialization
             => ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed);
 
     }
-
 
     internal static class JsonDicomConverterExtensions
     {

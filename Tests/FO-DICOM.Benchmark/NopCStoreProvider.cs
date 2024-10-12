@@ -1,18 +1,18 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Text;
 using System.Threading.Tasks;
-using FellowOakDicom.Imaging.Codec;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
+using Microsoft.Extensions.Logging;
 
 namespace FellowOakDicom.Benchmark
 {
     public class NopCStoreProvider : DicomService, IDicomServiceProvider, IDicomCStoreProvider
     {
-        public NopCStoreProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log, DicomServiceDependencies dependencies)
+        public NopCStoreProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log, DicomServiceDependencies dependencies)
             : base(stream, fallbackEncoding, log, dependencies)
         {
         }

@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
 using System;
@@ -13,7 +14,7 @@ using Xunit;
 namespace FellowOakDicom.Tests
 {
 
-    [Collection("General")]
+    [Collection(TestCollections.General)]
     public class DicomElementTest
     {
         #region Unit tests
@@ -419,6 +420,16 @@ namespace FellowOakDicom.Tests
             Assert.IsType<DicomDataException>(exception);
         }
 
+        [Theory]
+        [MemberData(nameof(ValidDecimalToStringData))]
+        public void DicomDecimalString_ToDecimalString_ReturnsExpectedValue(decimal value, string expectedString)
+        {
+            var actual = DicomDecimalString.ToDecimalString(value);
+
+            Assert.True(actual.Length <= 16, actual);
+            Assert.Equal(expectedString, actual);
+        }
+
         #endregion
 
         #region Support methods
@@ -484,6 +495,7 @@ namespace FellowOakDicom.Tests
             new object[] { DicomUID.ImplicitVRLittleEndian, DicomTransferSyntax.ImplicitVRLittleEndian },
             new object[] { DicomUID.JPEGExtended12Bit, DicomTransferSyntax.JPEGProcess2_4 },
             new object[] { DicomUID.JPEG2000Lossless, DicomTransferSyntax.JPEG2000Lossless },
+            new object[] { DicomUID.HTJ2KLossless, DicomTransferSyntax.HTJ2KLossless },
             new object[] { DicomUID.ExplicitVRBigEndianRETIRED, DicomTransferSyntax.ExplicitVRBigEndian },
             new object[] { DicomUID.GEPrivateImplicitVRBigEndian, DicomTransferSyntax.GEPrivateImplicitVRBigEndian },
             new object[] { DicomUID.MPEG2MPML, DicomTransferSyntax.MPEG2 }
@@ -500,11 +512,28 @@ namespace FellowOakDicom.Tests
 
         public static IEnumerable<object[]> NonTransferSyntaxUids = new[]
         {
-            new object[] { DicomUID.AbdominopelvicArteriesPaired12111 },
+            new object[] { DicomUID.AbdominopelvicArteryPaired12111 },
             new object[] { DicomUID.CTImageStorage },
             new object[] { DicomUID.StorageCommitmentPushModel },
             new object[] { DicomUID.dicomTransferSyntax },
             new object[] { DicomUID.PETPalette }
+        };
+
+        public static IEnumerable<object[]> ValidDecimalToStringData = new[]
+        {
+            new object[] { 0.142916000000001m, "0.142916" },
+            new object[] { 0.142916m, "0.142916" },
+            new object[] { 0.12345678911234m, "0.12345678911234" },
+            new object[] { 0.12345678911234567m, "0.1234567891" },
+            new object[] { -0.12345678911234567m, "-0.1234567891" },
+            new object[] { -12345678911234.1m, "-1.234567891E+13" },
+            new object[] { 12345678911234.1m,  "12345678911234.1" },
+            new object[] { 123456789112345.7m, "1.234567891E+14" },
+            new object[] { 1234567891123456789m, "1.234567891E+18" },
+            new object[] { 1.1E-27m, "1.1E-27" },
+            new object[] { -1.1E-27m, "-1.1E-27" },
+            new object[] { 1.1E27m, "1.1E+27" },
+            new object[] { -1.1E27m, "-1.1E+27" }
         };
 
         #endregion

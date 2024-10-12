@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO;
 using System;
@@ -77,10 +78,8 @@ namespace FellowOakDicom
 
         #region METHODS
 
-        /// <inheritdoc />
         public override string ToString() => UID.Name;
 
-        /// <inheritdoc />
         public override bool Equals(object obj)
         {
             return obj switch
@@ -92,7 +91,6 @@ namespace FellowOakDicom
             };
         }
 
-        /// <inheritdoc />
         public override int GetHashCode() => UID.GetHashCode();
 
         #endregion
@@ -472,9 +470,32 @@ namespace FellowOakDicom
                 Endian = Endian.Little
             };
 
+
+        /// <summary>Fragmentable MPEG2 Main Profile @ Main Level</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG2 =
+            new DicomTransferSyntax(DicomUID.MPEG2MPMLF)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_13818_2",
+                Endian = Endian.Little
+            };
+
         ///<summary>MPEG2 Main Profile / High Level</summary>
         public static readonly DicomTransferSyntax MPEG2MainProfileHighLevel =
             new DicomTransferSyntax(DicomUID.MPEG2MPHL)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_13818_2",
+                Endian = Endian.Little
+            };
+
+        ///<summary>Fragmentable MPEG2 Main Profile / High Level</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG2MainProfileHighLevel =
+            new DicomTransferSyntax(DicomUID.MPEG2MPHLF)
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
@@ -489,6 +510,19 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
+                Endian = Endian.Little
+            };
+
+        ///<summary>Fragmentable MPEG-4 AVC/H.264 High Profile / Level 4.1</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG4AVCH264HighProfileLevel41 =
+            new DicomTransferSyntax(DicomUID.MPEG4HP41F)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
                 Endian = Endian.Little
             };
 
@@ -498,6 +532,19 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
+                Endian = Endian.Little
+            };
+
+        ///<summary>Fragmentable MPEG-4 AVC/H.264 BD-compatible High Profile / Level 4.1</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG4AVCH264BDCompatibleHighProfileLevel41 =
+            new DicomTransferSyntax(DicomUID.MPEG4HP41BDF)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
                 Endian = Endian.Little
             };
 
@@ -507,6 +554,19 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
+                Endian = Endian.Little
+            };
+
+        ///<summary>Fragmentable MPEG-4 AVC/H.264 High Profile / Level 4.2 For 2D Video</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG4AVCH264HighProfileLevel42For2DVideo =
+            new DicomTransferSyntax(DicomUID.MPEG4HP422DF)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
                 Endian = Endian.Little
             };
 
@@ -516,6 +576,19 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
+                Endian = Endian.Little
+            };
+
+        ///<summary>Fragmentable MPEG-4 AVC/H.264 High Profile / Level 4.2 For 3D Video</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG4AVCH264HighProfileLevel42For3DVideo =
+            new DicomTransferSyntax(DicomUID.MPEG4HP423DF)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
                 Endian = Endian.Little
             };
 
@@ -525,6 +598,19 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
+                Endian = Endian.Little
+            };
+
+        ///<summary>Fragmentable MPEG-4 AVC/H.264 Stereo High Profile / Level 4.2</summary>
+        public static readonly DicomTransferSyntax FragmentableMPEG4AVCH264StereoHighProfileLevel42 =
+            new DicomTransferSyntax(DicomUID.MPEG4HP42STEREOF)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_14496_10",
                 Endian = Endian.Little
             };
 
@@ -534,6 +620,8 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_23008_2",
                 Endian = Endian.Little
             };
 
@@ -543,8 +631,57 @@ namespace FellowOakDicom
             {
                 IsExplicitVR = true,
                 IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_23008_2",
                 Endian = Endian.Little
             };
+
+        /// <summary>High-Throughput JPEG 2000 Image Compression (Lossless Only)</summary>
+        public static readonly DicomTransferSyntax HTJ2KLossless =
+            new DicomTransferSyntax(DicomUID.HTJ2KLossless)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                Endian = Endian.Little
+            };
+
+        /// <summary>High-Throughput JPEG 2000 with RPCL Options Image Compression (Lossless Only)</summary>
+        public static readonly DicomTransferSyntax HTJ2KLosslessRPCL =
+            new DicomTransferSyntax(DicomUID.HTJ2KLosslessRPCL)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                Endian = Endian.Little
+            };
+
+        ///<summary>High-Throughput JPEG 2000 Image Compression</summary>
+        public static readonly DicomTransferSyntax HTJ2K =
+            new DicomTransferSyntax(DicomUID.HTJ2K)
+            {
+                IsExplicitVR = true,
+                IsEncapsulated = true,
+                IsLossy = true,
+                LossyCompressionMethod = "ISO_15444_15",
+                Endian = Endian.Little
+            };
+
+        ///<summary>JPIP HTJ2K Referenced</summary>
+        public static readonly DicomTransferSyntax JPIPHTJ2KReferenced =
+            new DicomTransferSyntax(DicomUID.JPIPHTJ2KReferenced)
+            {
+                IsExplicitVR = true,
+                Endian = Endian.Little
+            };
+
+        ///<summary>JPIP HTJ2K Referenced Deflate</summary>
+        public static readonly DicomTransferSyntax JPIPHTJ2KReferencedDeflate =
+            new DicomTransferSyntax(DicomUID.JPIPHTJ2KReferencedDeflate)
+            {
+                IsExplicitVR = true,
+                IsDeflate = true,
+                Endian = Endian.Little
+            };
+
 
         /// <summary>RLE Lossless</summary>
         public static readonly DicomTransferSyntax RLELossless =
@@ -624,14 +761,26 @@ namespace FellowOakDicom
             Entries.Add(JPIPReferenced.UID, JPIPReferenced);
             Entries.Add(JPIPReferencedDeflate.UID, JPIPReferencedDeflate);
             Entries.Add(MPEG2.UID, MPEG2);
+            Entries.Add(FragmentableMPEG2.UID, FragmentableMPEG2);
             Entries.Add(MPEG2MainProfileHighLevel.UID, MPEG2MainProfileHighLevel);
+            Entries.Add(FragmentableMPEG2MainProfileHighLevel.UID, FragmentableMPEG2MainProfileHighLevel);
             Entries.Add(MPEG4AVCH264HighProfileLevel41.UID, MPEG4AVCH264HighProfileLevel41);
+            Entries.Add(FragmentableMPEG4AVCH264HighProfileLevel41.UID, FragmentableMPEG4AVCH264HighProfileLevel41);
             Entries.Add(MPEG4AVCH264BDCompatibleHighProfileLevel41.UID, MPEG4AVCH264BDCompatibleHighProfileLevel41);
+            Entries.Add(FragmentableMPEG4AVCH264BDCompatibleHighProfileLevel41.UID, FragmentableMPEG4AVCH264BDCompatibleHighProfileLevel41);
             Entries.Add(MPEG4AVCH264HighProfileLevel42For2DVideo.UID, MPEG4AVCH264HighProfileLevel42For2DVideo);
+            Entries.Add(FragmentableMPEG4AVCH264HighProfileLevel42For2DVideo.UID, FragmentableMPEG4AVCH264HighProfileLevel42For2DVideo);
             Entries.Add(MPEG4AVCH264HighProfileLevel42For3DVideo.UID, MPEG4AVCH264HighProfileLevel42For3DVideo);
+            Entries.Add(FragmentableMPEG4AVCH264HighProfileLevel42For3DVideo.UID, FragmentableMPEG4AVCH264HighProfileLevel42For3DVideo);
             Entries.Add(MPEG4AVCH264StereoHighProfileLevel42.UID, MPEG4AVCH264StereoHighProfileLevel42);
+            Entries.Add(FragmentableMPEG4AVCH264StereoHighProfileLevel42.UID, FragmentableMPEG4AVCH264StereoHighProfileLevel42);
             Entries.Add(HEVCH265MainProfileLevel51.UID, HEVCH265MainProfileLevel51);
             Entries.Add(HEVCH265Main10ProfileLevel51.UID, HEVCH265Main10ProfileLevel51);
+            Entries.Add(HTJ2KLossless.UID, HTJ2KLossless);
+            Entries.Add(HTJ2KLosslessRPCL.UID, HTJ2KLosslessRPCL);
+            Entries.Add(HTJ2K.UID, HTJ2K);
+            Entries.Add(JPIPHTJ2KReferenced.UID, JPIPHTJ2KReferenced);
+            Entries.Add(JPIPHTJ2KReferencedDeflate.UID, JPIPHTJ2KReferencedDeflate);
             Entries.Add(RLELossless.UID, RLELossless);
             Entries.Add(RFC2557MIMEEncapsulation.UID, RFC2557MIMEEncapsulation);
             Entries.Add(XMLEncoding.UID, XMLEncoding);

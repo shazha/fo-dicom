@@ -1,11 +1,13 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
-using FellowOakDicom.Log;
+using FellowOakDicom.Network.Tls;
 using System;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace FellowOakDicom.Network
 {
@@ -69,13 +71,14 @@ namespace FellowOakDicom.Network
         /// </summary>
         /// <param name="ipAddress">IP address(es) for the server to listen to.</param>
         /// <param name="port">Port to which the server should be listening.</param>
-        /// <param name="certificateName">Certificate name for secure connections.</param>
+        /// <param name="tlsAcceptor">Handler to accept secure connections.</param>
         /// <param name="fallbackEncoding">Encoding to apply if no encoding is identified.</param>
-        /// <param name="options">Service options.</param>
+        /// <param name="serviceOptions">Service options</param>
         /// <param name="userState">User state to be shared with the connected services.</param>
-        /// <returns>Awaitable <see cref="Task"/>.</returns>
-        Task StartAsync(string ipAddress, int port, string certificateName, Encoding fallbackEncoding,
-            DicomServiceOptions options, object userState);
+        /// <param name="serverOptions">Server options</param>
+        /// <returns>Awaitable <see cref="System.Threading.Tasks.Task"/>.</returns>
+        Task StartAsync(string ipAddress, int port, ITlsAcceptor tlsAcceptor, Encoding fallbackEncoding,
+            DicomServiceOptions serviceOptions, object userState, DicomServerOptions serverOptions);
 
         /// <summary>
         /// Stop server from further listening.

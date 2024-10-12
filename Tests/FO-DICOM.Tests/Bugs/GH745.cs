@@ -1,20 +1,21 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
 using FellowOakDicom.Network.Client;
 using FellowOakDicom.Tests.Helpers;
 using FellowOakDicom.Tests.Network;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace FellowOakDicom.Tests.Bugs
 {
-    [Collection("Network"), Trait("Category", "Network")]
+    [Collection(TestCollections.Network), Trait(TestTraits.Category, TestCategories.Network)]
     public class GH745
     {
         private readonly XUnitDicomLogger _logger;
@@ -56,16 +57,16 @@ namespace FellowOakDicom.Tests.Bugs
                     {
                         OnResponseReceived = (req, res) =>
                         {
-                            testLogger.Info("Response #{0} / expected #{1}", actual, req.UserState);
+                            testLogger.LogInformation("Response #{0} / expected #{1}", actual, req.UserState);
                             Interlocked.Increment(ref actual);
-                            testLogger.Info("         #{0} / expected #{1}", actual - 1, req.UserState);
+                            testLogger.LogInformation("         #{0} / expected #{1}", actual - 1, req.UserState);
                         },
                         UserState = i
                     }
-                ).ConfigureAwait(false);
-                testLogger.Info("Sending #{0}", i);
-                await client.SendAsync().ConfigureAwait(false);
-                testLogger.Info("Sent (or timed out) #{0}", i);
+                );
+                testLogger.LogInformation("Sending #{0}", i);
+                await client.SendAsync();
+                testLogger.LogInformation("Sent (or timed out) #{0}", i);
             }
 
             Assert.Equal(expected, actual);
@@ -102,19 +103,19 @@ namespace FellowOakDicom.Tests.Bugs
                         {
                             OnResponseReceived = (req, res) =>
                             {
-                                testLogger.Info("Response #{0}", requestIndex);
+                                testLogger.LogInformation("Response #{0}", requestIndex);
                                 Interlocked.Increment(ref actual);
                             }
                         }
-                    ).ConfigureAwait(false);
+                    );
 
-                    testLogger.Info("Sending #{0}", requestIndex);
-                    await client.SendAsync().ConfigureAwait(false);
-                    testLogger.Info("Sent (or timed out) #{0}", requestIndex);
+                    testLogger.LogInformation("Sending #{0}", requestIndex);
+                    await client.SendAsync();
+                    testLogger.LogInformation("Sent (or timed out) #{0}", requestIndex);
                 }
             ).ToArray();
 
-            await Task.WhenAll(requests).ConfigureAwait(false);
+            await Task.WhenAll(requests);
 
             Assert.Equal(expected, actual);
         }

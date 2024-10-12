@@ -1,4 +1,8 @@
-﻿using FellowOakDicom.Imaging;
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
+// Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
+
+using FellowOakDicom.Imaging;
 using Xunit;
 
 namespace FellowOakDicom.Tests.Bugs
@@ -12,10 +16,10 @@ namespace FellowOakDicom.Tests.Bugs
             var testFile = DicomFile.Open("./Test Data/GH1442.dcm");
 
             // Act
-            var grayScaleRenderOptions = GrayscaleRenderOptions.FromDataset(testFile.Dataset);
+            var grayScaleRenderOptions = GrayscaleRenderOptions.FromDataset(testFile.Dataset, 0);
 
             // Assert
-            Assert.Null(grayScaleRenderOptions.ModalityLUTSequence);
+            Assert.Null(grayScaleRenderOptions.ModalityLUT);
         }
     }
 }

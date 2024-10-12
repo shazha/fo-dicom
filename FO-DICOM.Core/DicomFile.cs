@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO;
 using FellowOakDicom.IO.Reader;
@@ -159,7 +160,7 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="fileName">Name of file.</param>
         /// <param name="options">Options to apply during writing.</param>
-        /// <returns>Awaitable <see cref="Task"/>.</returns>
+        /// <returns>Awaitable <see cref="System.Threading.Tasks.Task"/>.</returns>
         public async Task SaveAsync(string fileName, DicomWriteOptions options = null)
         {
             PreprocessFileMetaInformation();
@@ -219,7 +220,9 @@ namespace FellowOakDicom
             {
                 throw new ArgumentNullException(nameof(fallbackEncoding));
             }
+
             var df = new DicomFile();
+            df.Dataset.FallbackEncodings = new[] { fallbackEncoding };
 
             try
             {

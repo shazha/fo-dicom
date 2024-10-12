@@ -1,7 +1,9 @@
-// Copyright (c) 2012-2022 fo-dicom contributors.
+// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
+using FellowOakDicom.Tools;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -106,9 +108,9 @@ namespace FellowOakDicom
             /// <param name="source">A reader for a profile file source. If null, the default profile is loaded</param>
             /// <param name="options">The optional flags for the profile</param>
             /// <returns>A dictionary containing the security profile</returns>
-            /// <exception cref="ArgumentException">A regular expression parsing error occurred</exception>
-            /// <exception cref="IOException">An I/O error occurs</exception>
-            /// <exception cref="ObjectDisposedException">The TextReader is closed</exception>
+            /// <exception cref="System.ArgumentException">A regular expression parsing error occurred</exception>
+            /// <exception cref="System.IO.IOException">An I/O error occurs</exception>
+            /// <exception cref="System.ObjectDisposedException">The TextReader is closed</exception>
             public static SecurityProfile LoadProfile(TextReader source, SecurityProfileOptions options)
             {
                 var profile = new SecurityProfile();
@@ -361,8 +363,8 @@ namespace FellowOakDicom
 
             if (IsOtherElement(item)) // Replaces with an empty array
             {
-                var ctor = GetConstructor(item, typeof(DicomTag), typeof(IByteBuffer));
-                var updated = (DicomItem)ctor.Invoke(new object[] { tag, EmptyBuffer.Value });
+                var itemType = item.GetType();
+                var updated = (DicomItem)Activator.CreateInstance(itemType, tag, EmptyBuffer.Value);
                 dataset.AddOrUpdate(updated);
                 return;
             }
@@ -370,8 +372,8 @@ namespace FellowOakDicom
             var valueType = ElementValueType(item); // Replace with the default value
             if (valueType != null)
             {
-                var ctor = GetConstructor(item, typeof(DicomTag), valueType);
-                var updated = (DicomItem)ctor.Invoke(new[] { tag, Activator.CreateInstance(valueType) });
+                var itemType = item.GetType();
+                var updated = (DicomItem)Activator.CreateInstance(itemType, tag, Activator.CreateInstance(valueType));
                 dataset.AddOrUpdate(updated);
             }
         }
@@ -382,8 +384,8 @@ namespace FellowOakDicom
         protected static bool IsOtherElement(DicomItem item)
         {
             var t = item.GetType();
-            return t == typeof(DicomOtherByte) || t == typeof(DicomOtherDouble) || t == typeof(DicomOtherFloat)
-                   || t == typeof(DicomOtherLong) || t == typeof(DicomOtherWord) || t == typeof(DicomUnknown);
+            return t.IsOneOf(typeof(DicomOtherByte), typeof(DicomOtherDouble), typeof(DicomOtherFloat), 
+                typeof(DicomOtherLong), typeof(DicomOtherWord), typeof(DicomUnknown));
         }
 
         /// <summary>Evaluates whether an element has a generic valueType</summary>
@@ -391,7 +393,7 @@ namespace FellowOakDicom
         /// <returns>The data type if found, otherwise null</returns>
         protected static Type ElementValueType(DicomItem item)
         {
-            var t = item.GetType();
+            var t = item.GetType().BaseType;
             if (t.IsConstructedGenericType && t.GetGenericTypeDefinition() == typeof(DicomValueElement<>))
             {
                 return t.GenericTypeArguments[0];
@@ -407,22 +409,6 @@ namespace FellowOakDicom
         protected static void ReplaceString(DicomDataset dataset, DicomItem item, string newString)
         {
             dataset.AddOrUpdate(item.ValueRepresentation, item.Tag, newString);
-        }
-
-        /// <summary>
-        /// Use reflection to get strongly-typed constructor info from <paramref name="item"/>.
-        /// </summary>
-        /// <param name="item">DICOM item for which to get constructor.</param>
-        /// <param name="parameterTypes">Expected parameter types in the requested constructor.</param>
-        /// <returns>Constructor info corresponding to <paramref name="item"/> and <paramref name="parameterTypes"/>.</returns>
-        protected static ConstructorInfo GetConstructor(DicomItem item, params Type[] parameterTypes)
-        {
-            return item.GetType().GetTypeInfo().DeclaredConstructors.Single(
-                ci =>
-                    {
-                        var pars = ci.GetParameters().Select(par => par.ParameterType);
-                        return pars.SequenceEqual(parameterTypes);
-                    });
         }
 
         #endregion

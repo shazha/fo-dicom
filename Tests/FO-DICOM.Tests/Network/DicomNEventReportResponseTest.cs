@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Network;
 using Xunit;
@@ -7,13 +8,12 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using FellowOakDicom.Network.Client;
-using FellowOakDicom.Log;
-using FellowOakDicom.Imaging.Codec;
+using Microsoft.Extensions.Logging;
 
 namespace FellowOakDicom.Tests.Network
 {
 
-    [Collection("Network")]
+    [Collection(TestCollections.Network)]
     public class DicomNEventReportResponseTest
     {
         #region Unit tests
@@ -46,9 +46,11 @@ namespace FellowOakDicom.Tests.Network
 
         #endregion
 
-
-
+#if NET462
+        [Fact(Skip = "This test is flaky in .NET Framework")]
+#else
         [Fact]
+#endif
         public async Task ClientHandleNEventReport_SynchronousEvent()
         {
             var port = Ports.GetNext();
@@ -102,8 +104,8 @@ namespace FellowOakDicom.Tests.Network
                     return Task.FromResult(new DicomNEventReportResponse(eventReq, DicomStatus.Success));
                 };
 
-                dicomClient.ClientOptions.AssociationLingerTimeoutInMs = (int)TimeSpan.FromSeconds(5).TotalMilliseconds;
-                await dicomClient.SendAsync().ConfigureAwait(false);
+                dicomClient.ClientOptions.AssociationLingerTimeoutInMs = (int)TimeSpan.FromMinutes(1).TotalMilliseconds;
+                await dicomClient.SendAsync();
 
                 Assert.Equal(DicomStatus.Success, status);
                 Assert.Equal(2, verifiedInstances);

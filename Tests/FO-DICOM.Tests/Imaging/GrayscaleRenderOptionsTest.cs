@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2022 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -8,7 +9,7 @@ using Xunit;
 
 namespace FellowOakDicom.Tests.Imaging
 {
-    [Collection("WithTranscoder")]
+    [Collection(TestCollections.WithTranscoder)]
     public class GrayscaleRenderOptionsTest
     {
         #region Unit tests
@@ -17,7 +18,7 @@ namespace FellowOakDicom.Tests.Imaging
         public void ColorMap_Monochrome2ImageOptions_ReturnsMonochrome2ColorMap()
         {
             var file = DicomFile.Open(TestData.Resolve("CT1_J2KI"));
-            var options = GrayscaleRenderOptions.FromDataset(file.Dataset);
+            var options = GrayscaleRenderOptions.FromDataset(file.Dataset, 0);
             Assert.Same(ColorTable.Monochrome2, options.ColorMap);
         }
 
@@ -25,7 +26,7 @@ namespace FellowOakDicom.Tests.Imaging
         public void ColorMap_Setter_ReturnsSetColorMap()
         {
             var file = DicomFile.Open(TestData.Resolve("CT1_J2KI"));
-            var options = GrayscaleRenderOptions.FromDataset(file.Dataset);
+            var options = GrayscaleRenderOptions.FromDataset(file.Dataset, 0);
             options.ColorMap = ColorTable.Monochrome1;
             Assert.Same(ColorTable.Monochrome1, options.ColorMap);
         }
@@ -59,6 +60,22 @@ namespace FellowOakDicom.Tests.Imaging
             Assert.Equal(windowCenter, actual.WindowCenter);
         }
 
+        [Fact]
+        public void FromDataset_WindowCenterWidth_Monochrome()
+        {
+            var dataset = new DicomDataset(
+                new DicomCodeString(DicomTag.PhotometricInterpretation, "MONOCHROME2"),
+                new DicomUnsignedShort(DicomTag.BitsAllocated, 1),
+                new DicomUnsignedShort(DicomTag.BitsStored, 1),
+                new DicomUnsignedShort(DicomTag.PixelRepresentation, 0));
+
+            var actual = GrayscaleRenderOptions.FromDataset(dataset, 0);
+
+            Assert.Equal(1, actual.WindowWidth);
+            Assert.Equal(1, actual.WindowCenter);
+            Assert.Equal("LINEAR", actual.VOILUTFunction);
+        }
+
         [Theory]
         [InlineData((ushort)16, (ushort)12, (ushort)0, 1.0, 0.0, 500.0, 20.0, "LINEAR")]
         public void FromDataset_WindowCenterWidth_ReturnsSameAsFromWindowLevel(
@@ -83,7 +100,7 @@ namespace FellowOakDicom.Tests.Imaging
                 new DicomCodeString(DicomTag.VOILUTFunction, voiLutFunction));
 
             var expected = GrayscaleRenderOptions.FromWindowLevel(dataset);
-            var actual = GrayscaleRenderOptions.FromDataset(dataset);
+            var actual = GrayscaleRenderOptions.FromDataset(dataset, 0);
 
             Assert.Equal(expected.WindowWidth, actual.WindowWidth);
             Assert.Equal(expected.WindowCenter, actual.WindowCenter);
@@ -144,10 +161,12 @@ namespace FellowOakDicom.Tests.Imaging
                 new DicomCodeString(DicomTag.VOILUTFunction, voiLutFunction));
 
             var expected = GrayscaleRenderOptions.FromImagePixelValueTags(dataset);
-            var actual = GrayscaleRenderOptions.FromDataset(dataset);
+            var actual = GrayscaleRenderOptions.FromDataset(dataset, 0);
 
             Assert.Equal(expected.WindowWidth, actual.WindowWidth);
             Assert.Equal(expected.WindowCenter, actual.WindowCenter);
+            Assert.Equal(expectedWindowWidth, actual.WindowWidth);
+            Assert.Equal(expectedWindowCenter, actual.WindowCenter);
         }
 
         [Theory]
@@ -206,7 +225,7 @@ namespace FellowOakDicom.Tests.Imaging
             {
                 var options = optionFactory(dataset);
                 Assert.Null(options.VOILUTSequence);
-                Assert.Null(options.ModalityLUTSequence);
+                Assert.Null(options.ModalityLUT);
             }
         }
 
@@ -221,7 +240,7 @@ namespace FellowOakDicom.Tests.Imaging
             {
                 var options = optionFactory(dataset);
                 Assert.Null(options.VOILUTSequence);
-                Assert.Null(options.ModalityLUTSequence);
+                Assert.Null(options.ModalityLUT);
             }
         }
 
@@ -233,15 +252,26 @@ namespace FellowOakDicom.Tests.Imaging
             voiLutSequence.Items.Add(new DicomDataset());
             dataset.Add(voiLutSequence);
             var modalityLutSequence = new DicomSequence(DicomTag.ModalityLUTSequence);
-            modalityLutSequence.Items.Add(new DicomDataset());
+            modalityLutSequence.Items.Add(ValidModalityLutSequenceItem());
             dataset.Add(modalityLutSequence);
 
             foreach (var optionFactory in OptionsFactories())
             {
                 var options = optionFactory(dataset);
                 Assert.Equal(voiLutSequence, options.VOILUTSequence);
-                Assert.Equal(modalityLutSequence, options.ModalityLUTSequence);
+                Assert.NotNull(options.ModalityLUT);
             }
+        }
+
+        private DicomDataset ValidModalityLutSequenceItem()
+        {
+            ushort zeroUS = 0;
+            ushort oneUS = 1;
+            return new DicomDataset()
+            {
+                { DicomTag.LUTDescriptor, oneUS, zeroUS, zeroUS },
+                { DicomTag.LUTData, zeroUS, zeroUS, zeroUS }
+            };
         }
 
         private DicomDataset ValidDataset()
@@ -267,10 +297,10 @@ namespace FellowOakDicom.Tests.Imaging
         {
             return new List<Func<DicomDataset, GrayscaleRenderOptions>>
             {
-                GrayscaleRenderOptions.FromDataset,
+                d => GrayscaleRenderOptions.FromDataset(d, 0),
                 GrayscaleRenderOptions.FromBitRange,
                 GrayscaleRenderOptions.FromMinMax,
-                GrayscaleRenderOptions.FromWindowLevel,
+                d => GrayscaleRenderOptions.FromWindowLevel(d, 0),
                 GrayscaleRenderOptions.FromImagePixelValueTags,
                 dataset => GrayscaleRenderOptions.FromHistogram(dataset),
             };

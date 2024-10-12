@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections;
@@ -195,11 +196,14 @@ namespace FellowOakDicom.Imaging
         {
             var overlay = new int[Rows * Columns];
             var bits = new BitArray(Data.Data);
-            if (bits.Length < overlay.Length) throw new DicomDataException("Invalid overlay length: " + bits.Length);
+            if (bits.Length < overlay.Length)
+            {
+                throw new DicomDataException("Invalid overlay length: " + bits.Length);
+            }
+
             for (int i = 0, c = overlay.Length; i < c; i++)
             {
-                if (bits.Get(i)) overlay[i] = fg;
-                else overlay[i] = bg;
+                overlay[i] = bits.Get(i) ? fg : bg;
             }
             return overlay;
         }
@@ -222,7 +226,10 @@ namespace FellowOakDicom.Imaging
                 if (ds.GetDicomItem<DicomElement>(new DicomTag(group, 0x0010)).ValueRepresentation != DicomVR.US ||
                     string.IsNullOrEmpty(ds.GetSingleValueOrDefault<string>(OverlayTag(group, DicomTag.OverlayType), null)) ||
                    ds.GetValueOrDefault<ushort>(OverlayTag(group, DicomTag.OverlayColumns), 0, 0) == 0 ||
-                   ds.GetValueOrDefault<ushort>(OverlayTag(group, DicomTag.OverlayRows), 0, 0) == 0) continue;
+                   ds.GetValueOrDefault<ushort>(OverlayTag(group, DicomTag.OverlayRows), 0, 0) == 0)
+                {
+                    continue;
+                }
 
                 var overlay = new DicomOverlayData(ds, group);
                 overlays.Add(overlay);
@@ -245,7 +252,10 @@ namespace FellowOakDicom.Imaging
 
             foreach (var group in groups)
             {
-                if (!ds.Contains(new DicomTag(group, DicomTag.OverlayData.Element))) return true;
+                if (!ds.Contains(new DicomTag(group, DicomTag.OverlayData.Element)))
+                {
+                    return true;
+                }
             }
 
             return false;
@@ -277,8 +287,10 @@ namespace FellowOakDicom.Imaging
             {
                 // overlay embedded in high bits of pixel data
                 if (Dataset.InternalTransferSyntax.IsEncapsulated)
+                {
                     throw new DicomImagingException(
                         "Attempted to extract embedded overlay from compressed pixel data. Decompress pixel data before attempting this operation.");
+                }
 
                 var pixels = DicomPixelData.Create(Dataset);
 
@@ -308,7 +320,11 @@ namespace FellowOakDicom.Imaging
                         var i = y * Columns;
                         for (var x = 0; x < ow; x++)
                         {
-                            if ((data[n] & mask) != 0) bits[i] = true;
+                            if ((data[n] & mask) != 0)
+                            {
+                                bits[i] = true;
+                            }
+
                             n++;
                             i++;
                         }
@@ -325,7 +341,11 @@ namespace FellowOakDicom.Imaging
                         var i = y * Columns;
                         for (var x = 0; x < ow; x++)
                         {
-                            if ((data[n] & mask) != 0) bits[i] = true;
+                            if ((data[n] & mask) != 0)
+                            {
+                                bits[i] = true;
+                            }
+
                             n++;
                             i++;
                         }

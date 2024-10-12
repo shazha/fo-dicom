@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -129,7 +130,8 @@ namespace FellowOakDicom.Serialization
 
                     if (dataset.Contains(privateCreatorTag))
                     {
-                        item.Tag.PrivateCreator = new DicomPrivateCreator(dataset.GetSingleValue<string>(privateCreatorTag));
+                        var privateCreatorItem = dataset.GetDicomItem<DicomElement>(privateCreatorTag);
+                        item.Tag.PrivateCreator = new DicomPrivateCreator(privateCreatorItem.Get<string>());
                     }
                 }
             }
@@ -488,7 +490,7 @@ namespace FellowOakDicom.Serialization
                 {
                     numberWriterAction();
                 }
-                catch (FormatException)
+                catch (Exception ex) when (ex is FormatException || ex is OverflowException)
                 {
                     if (_numberSerializationMode == NumberSerializationMode.PreferablyAsNumber)
                     {

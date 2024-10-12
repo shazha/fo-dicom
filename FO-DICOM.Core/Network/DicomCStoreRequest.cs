@@ -1,6 +1,8 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
+using FellowOakDicom.Network.Client;
 using System.Collections.Generic;
 
 namespace FellowOakDicom.Network
@@ -8,30 +10,6 @@ namespace FellowOakDicom.Network
     /// <summary>
     /// Represents a DICOM C-Store request to be sent to a C-Store SCP or a C-Store request that has been received from a C-Store SCU.
     /// </summary>
-    /// <example>
-    /// The following example shows how to use the <see cref="DicomClient"/> class to send DICOM C-Store requests to a DICOM C-Store SCP.
-    /// <code>
-    /// var client = new DicomClient();
-    ///
-    /// // queue C-Store request to send DICOM file
-    /// client.Add(new DicomCStoreRequest(@"test1.dcm") {
-    ///		OnResponseReceived = (DicomCStoreRequest req, DicomCStoreResponse rsp) => {
-    ///			Console.WriteLine("{0}: {1}", req.SOPInstanceUID, rsp.Status);
-    ///		}
-    /// });
-    ///
-    /// // queue C-Store request with additional proposed transfer syntaxes
-    /// client.Add(new DicomCStoreRequest(@"test2.dcm") {
-    ///		AdditionalTransferSyntaxes = new DicomTransferSyntax[] {
-    ///			DicomTransferSyntax.JPEGLSLossless,
-    ///			DicomTransferSyntax.JPEG2000Lossless
-    ///		}
-    /// });
-    ///
-    /// // connect and send queued requests
-    /// client.Send("127.0.0.1", 12345, false, "SCU", "ANY-SCP");
-    /// </code>
-    /// </example>
     public sealed class DicomCStoreRequest : DicomPriorityRequest
     {
         /// <summary>
@@ -97,6 +75,13 @@ namespace FellowOakDicom.Network
         /// DICOM dataset will be transcoded on the fly if necessary.
         /// </summary>
         public DicomTransferSyntax[] AdditionalTransferSyntaxes { get; set; }
+
+        /// <summary>
+        /// If set, the default transfer syntax (Implicit VR Little Endian) will
+        /// not be automatically proposed when associating with remote system. 
+        /// This should only be used in exception cases (See PS3.5 section 10.1).
+        /// </summary>
+        public bool OmitImplicitVrTransferSyntaxInAssociationRequest { get; set; }
 
         /// <summary>
         /// Gets or sets the (optional) Common Extended Negotiation Service Class UID.

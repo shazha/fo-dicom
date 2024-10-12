@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,14 @@ namespace FellowOakDicom.IO.Buffer
     public sealed class StreamByteBuffer : IByteBuffer
     {
         private readonly IMemoryProvider _memoryProvider;
+            
+        /// <summary>
+        /// Since <see cref="SemaphoreSlim"/> implements <see cref="IDisposable"/> and <see cref="StreamByteBuffer"/> doesn't,
+        /// this SemaphoreSlim can't be disposed at the right time
+        /// However, <a href="https://stackoverflow.com/questions/32033416/do-i-need-to-dispose-a-semaphoreslim">this excerpt from Stack Overflow</a>
+        /// suggests that not disposing of SemaphoreSlim is okay as long as <see cref="SemaphoreSlim.AvailableWaitHandle"/> is never used
+        /// </summary>
+        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
         public StreamByteBuffer(Stream stream, long position, long length) : this(stream, position, length, Setup.ServiceProvider.GetRequiredService<IMemoryProvider>())
         {
@@ -88,18 +97,26 @@ namespace FellowOakDicom.IO.Buffer
 
             int bufferSize = 1024 * 1024;
             using IMemory buffer = _memoryProvider.Provide(bufferSize);
-            
-            Stream.Position = Position;
-            
-            long totalNumberOfBytesRead = 0L;
-            int numberOfBytesToRead = (int)Math.Min(Size, bufferSize);
-            int numberOfBytesRead;
-            while(numberOfBytesToRead > 0
-                  && (numberOfBytesRead = Stream.Read(buffer.Bytes, 0, numberOfBytesToRead)) > 0)
+
+            _semaphore.Wait();
+            try
             {
-                stream.Write(buffer.Bytes, 0, numberOfBytesRead);
-                totalNumberOfBytesRead += numberOfBytesRead;
-                numberOfBytesToRead = (int)Math.Min(Size - totalNumberOfBytesRead, bufferSize);
+                Stream.Position = Position;
+
+                long totalNumberOfBytesRead = 0L;
+                int numberOfBytesToRead = (int)Math.Min(Size, bufferSize);
+                int numberOfBytesRead;
+                while (numberOfBytesToRead > 0
+                      && (numberOfBytesRead = Stream.Read(buffer.Bytes, 0, numberOfBytesToRead)) > 0)
+                {
+                    stream.Write(buffer.Bytes, 0, numberOfBytesRead);
+                    totalNumberOfBytesRead += numberOfBytesRead;
+                    numberOfBytesToRead = (int)Math.Min(Size - totalNumberOfBytesRead, bufferSize);
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
             }
         }
 
@@ -123,33 +140,51 @@ namespace FellowOakDicom.IO.Buffer
             int bufferSize = 1024 * 1024;
             using IMemory buffer = _memoryProvider.Provide(bufferSize);
 
-            Stream.Position = Position;
-            
-            long totalNumberOfBytesRead = 0L;
-            int numberOfBytesToRead = (int)Math.Min(Size, bufferSize);
-            int numberOfBytesRead;
-            while(numberOfBytesToRead > 0 
-                && (numberOfBytesRead = await Stream.ReadAsync(buffer.Bytes, 0, numberOfBytesToRead, cancellationToken).ConfigureAwait(false)) > 0)
+            await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                await stream.WriteAsync(buffer.Bytes, 0, numberOfBytesRead, cancellationToken).ConfigureAwait(false);
-                totalNumberOfBytesRead += numberOfBytesRead;
-                numberOfBytesToRead = (int)Math.Min(Size - totalNumberOfBytesRead, bufferSize);
+                Stream.Position = Position;
+
+                long totalNumberOfBytesRead = 0L;
+                int numberOfBytesToRead = (int)Math.Min(Size, bufferSize);
+                int numberOfBytesRead;
+                while (numberOfBytesToRead > 0
+                    && !cancellationToken.IsCancellationRequested
+                    && (numberOfBytesRead = await Stream.ReadAsync(buffer.Bytes, 0, numberOfBytesToRead, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await stream.WriteAsync(buffer.Bytes, 0, numberOfBytesRead, cancellationToken).ConfigureAwait(false);
+                    totalNumberOfBytesRead += numberOfBytesRead;
+                    numberOfBytesToRead = (int)Math.Min(Size - totalNumberOfBytesRead, bufferSize);
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
             }
         }
 
         private void ReadStream(byte[] buffer, long offset, long count)
         {
-            Stream.Position = Position + offset;
-
-            long totalBytesRead = 0L;
-            int bytesRemaining = (int)Math.Min(Size, count);
-            int bytesReadNow;
-            while (bytesRemaining > 0
-                    && (bytesReadNow = Stream.Read(buffer, (int)totalBytesRead, bytesRemaining)) > 0)
+            _semaphore.Wait();
+            try
             {
-                totalBytesRead += bytesReadNow;
-                bytesRemaining = (int)Math.Min(Size - totalBytesRead, count - totalBytesRead);
+                Stream.Position = Position + offset;
+
+                long totalBytesRead = 0L;
+                int bytesRemaining = (int)Math.Min(Size, count);
+                int bytesReadNow;
+                while (bytesRemaining > 0
+                        && (bytesReadNow = Stream.Read(buffer, (int)totalBytesRead, bytesRemaining)) > 0)
+                {
+                    totalBytesRead += bytesReadNow;
+                    bytesRemaining = (int)Math.Min(Size - totalBytesRead, count - totalBytesRead);
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
             }
         }
+
     }
 }

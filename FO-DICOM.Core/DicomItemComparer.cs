@@ -1,7 +1,8 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
-using System;
+using FellowOakDicom.IO.Buffer;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,14 +18,25 @@ namespace FellowOakDicom
 
     public class DicomValueComparer : IEqualityComparer<DicomItem>
     {
+        public static DicomValueComparer DefaultInstance { get; set; } = new DicomValueComparer();
+
         public bool Equals(DicomItem item1, DicomItem item2)
         {
+            if (ReferenceEquals(item1, item2))
+            {
+                // short circuit comparing the same item
+                return true;
+            }
             if (item1 is DicomElement xElement && item2 is DicomElement yElement)
             {
-                var xValue = string.Join("\\", xElement.Get<string[]>());
-                var yValue = string.Join("\\", yElement.Get<string[]>());
+                if (xElement.Buffer is BulkDataUriByteBuffer xBulkbuffer && !xBulkbuffer.IsMemory || 
+                    yElement.Buffer is BulkDataUriByteBuffer yBulkbuffer && !yBulkbuffer.IsMemory)
+                {
+                    // skip validation in case of BulkDataUriByteBuffer, where the content has not been downloaded
+                    return item1.Tag == item2.Tag;
+                }
 
-                return item1.Tag == item2.Tag && xValue == yValue;
+                return xElement.Tag == yElement.Tag && xElement.Equals(yElement);
             }
 
             if (item1 is DicomSequence xSequence && item2 is DicomSequence ySequence)
@@ -35,12 +47,11 @@ namespace FellowOakDicom
                     return false;
                 }
 
-                var datasetComparer = new DicomDatasetComparer();
                 for (var i = 0; i < itemsCount; i++)
                 {
                     var dataset1 = xSequence.Items[i];
                     var dataset2 = ySequence.Items[i];
-                    if (!datasetComparer.Equals(dataset1, dataset2))
+                    if (!DicomDatasetComparer.DefaultInstance.Equals(dataset1, dataset2))
                     {
                         return false;
                     }
@@ -68,6 +79,9 @@ namespace FellowOakDicom
 
     public class DicomDatasetComparer : IEqualityComparer<DicomDataset>
     {
+
+        public static DicomDatasetComparer DefaultInstance { get; set; } = new DicomDatasetComparer();
+
         public bool Equals(DicomDataset dataset1, DicomDataset dataset2)
         {
             if ((dataset1 == null) != (dataset2 == null))
@@ -86,10 +100,10 @@ namespace FellowOakDicom
                 return false;
             }
 
-            var valueComparer = new DicomValueComparer();
-            foreach (var elements in dataset1.Zip(dataset2, Tuple.Create))
+            foreach (var element in dataset1)
             {
-                if (!valueComparer.Equals(elements.Item1, elements.Item2))
+                var element2 = dataset2.GetDicomItem<DicomItem>(element.Tag);
+                if (!DicomValueComparer.DefaultInstance.Equals(element, element2))
                 {
                     return false;
                 }

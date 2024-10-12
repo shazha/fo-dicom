@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.AspNetCore.Server;
 using FellowOakDicom.Network;
@@ -17,7 +18,6 @@ namespace FellowOakDicom.AspNetCore
 
         public static IServiceCollection UseFellowOakDicom(this IServiceCollection services)
             => services.AddFellowOakDicom()
-                .AddLogManager<DicomLogManager>()
                 .AddTransient<IHostedService, DicomInitializationHelper>(provider => {
                     DicomSetupBuilder.UseServiceProvider(provider);
                     return new DicomInitializationHelper();

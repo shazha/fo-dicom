@@ -1,5 +1,6 @@
-// Copyright (c) 2012-2021 fo-dicom contributors.
+// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace FellowOakDicom.Imaging.Render
 {
 
     /// <summary>
-    /// The Composite Graphic implementation of <seealso cref="IGraphic"/> which layers graphics one over the other
+    /// The Composite Graphic implementation of <see cref="IGraphic"/> which layers graphics one over the other
     /// </summary>
     public class CompositeGraphic : IGraphic
     {
@@ -22,7 +23,7 @@ namespace FellowOakDicom.Imaging.Render
         #region Public Constructor
 
         /// <summary>
-        /// Initialize new instance of <seealso cref="CompositeGraphic"/>
+        /// Initialize new instance of <see cref="CompositeGraphic"/>
         /// </summary>
         /// <param name="bg">background (initial) graphic layer</param>
         public CompositeGraphic(IGraphic bg)

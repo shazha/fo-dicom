@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
+// Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +10,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FellowOakDicom.Imaging;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
 using FellowOakDicom.Network.Client;
 using FellowOakDicom.Network.Client.Advanced.Connection;
@@ -14,13 +17,14 @@ using FellowOakDicom.Tests.Helpers;
 using FellowOakDicom.Tests.Network;
 using FellowOakDicom.Tests.Network.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace FellowOakDicom.Tests.Bugs
 {
-    [Collection("Network")]
+    [Collection(TestCollections.Network)]
     public class GH1359
     {
         private readonly XUnitDicomLogger _logger;
@@ -32,19 +36,20 @@ namespace FellowOakDicom.Tests.Bugs
 
         private IDicomClientFactory CreateClientFactory(INetworkManager networkManager)
         {
-            var logManager = Setup.ServiceProvider.GetRequiredService<ILogManager>();
+            var loggerFactory = Setup.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var dicomServiceDependencies = Setup.ServiceProvider.GetRequiredService<DicomServiceDependencies>();
             var defaultClientOptions = Setup.ServiceProvider.GetRequiredService<IOptions<DicomClientOptions>>();
             var defaultServiceOptions = Setup.ServiceProvider.GetRequiredService<IOptions<DicomServiceOptions>>();
-            var advancedDicomClientConnectionFactory = new DefaultAdvancedDicomClientConnectionFactory(networkManager, logManager, defaultServiceOptions, dicomServiceDependencies);
+            var advancedDicomClientConnectionFactory = new DefaultAdvancedDicomClientConnectionFactory(networkManager, loggerFactory, defaultServiceOptions, dicomServiceDependencies);
             return new DefaultDicomClientFactory(
                 defaultClientOptions,
                 defaultServiceOptions,
-                logManager,
-                advancedDicomClientConnectionFactory);
+                loggerFactory,
+                advancedDicomClientConnectionFactory,
+                Setup.ServiceProvider);
         }
 
-        [Theory]
+        [TheoryForNetCore] // This test is flaky in .NET Framework
         [InlineData(1)]
         [InlineData(3)]
         public async Task SendingCStoreRequest_AfterPreviousCStoreRequestTimedOut_ShouldUseSeparateAssociation(int asyncInvoked)
@@ -96,12 +101,11 @@ namespace FellowOakDicom.Tests.Bugs
             };
 
             var receivedRequests = new List<DicomCStoreRequest>();
-            var random = new Random();
             server.OnCStoreRequest = (association, storeRequest) =>
             {
                 receivedRequests.Add(storeRequest);
 
-                Thread.Sleep(random.Next(0, 100));
+                Thread.Sleep(100);
 
                 return new DicomCStoreResponse(storeRequest, DicomStatus.Success);
             };
@@ -119,17 +123,17 @@ namespace FellowOakDicom.Tests.Bugs
             ));
             var client = clientFactory.Create("127.0.0.1", port, false, "AnySCU", "AnySCP");
             client.ClientOptions.AssociationLingerTimeoutInMs = 0;
-            client.ServiceOptions.RequestTimeout = TimeSpan.FromSeconds(1);
+            client.ServiceOptions.RequestTimeout = TimeSpan.FromSeconds(5);
             client.ServiceOptions.MaxPDULength = server.Options.MaxPDULength;
             client.Logger = _logger.IncludePrefix("Client");
             client.NegotiateAsyncOps(asyncInvoked, 1);
             Exception exception = null;
 
             // Act
-            await client.AddRequestsAsync(requests).ConfigureAwait(false);
+            await client.AddRequestsAsync(requests);
             try
             {
-                await client.SendAsync(CancellationToken.None).ConfigureAwait(false);
+                await client.SendAsync(CancellationToken.None);
             }
             catch (Exception e)
             {
@@ -142,12 +146,14 @@ namespace FellowOakDicom.Tests.Bugs
             var numberOfRequestsThatSucceeded = responses.Count(r => r.Status.State == DicomState.Success);
             var numberOfRequestsThatFailed = requests.Count - numberOfRequestsThatSucceeded;
 
-            _logger.Info($"Succeeded: {numberOfRequestsThatSucceeded}");
-            _logger.Info($"Failed: {numberOfRequestsThatFailed}");
+            _logger.LogInformation($"Succeeded: {numberOfRequestsThatSucceeded}");
+            _logger.LogInformation($"Failed: {numberOfRequestsThatFailed}");
 
-            Assert.Contains(requestsThatSucceeded, r => r.MessageID == firstRequest.MessageID);
-            Assert.Contains(requestsThatFailed, r => r.MessageID == secondRequest.MessageID);
-            Assert.Contains(requestsThatSucceeded, r => r.MessageID == thirdRequest.MessageID);
+            var idsThatSucceeded = requestsThatSucceeded.ToList().Select(r => r.MessageID.ToString()).ToList();
+            var idsThatFailed = requestsThatFailed.ToList().Select(r => r.MessageID.ToString()).ToList();
+            Assert.Contains(firstRequest.MessageID.ToString(), idsThatSucceeded);
+            Assert.Contains(secondRequest.MessageID.ToString(), idsThatFailed);
+            Assert.Contains(thirdRequest.MessageID.ToString(), idsThatSucceeded);
 
             var receivedRequestsThatSucceeded = receivedRequests
                 .Where(r => !messageIdsThatTimedOut.Contains(r.MessageID))
@@ -164,7 +170,7 @@ namespace FellowOakDicom.Tests.Bugs
             Parallel.For((long)0, receivedRequestsThatSucceeded.Count, i =>
             {
                 var request = receivedRequestsThatSucceeded[(int) i];
-                _logger.Info($"Verifying pixel data of request [{request.MessageID}]");
+                _logger.LogInformation($"Verifying pixel data of request [{request.MessageID}]");
 
                 var actualPixelData = DicomPixelData.Create(request.File.Dataset);
 

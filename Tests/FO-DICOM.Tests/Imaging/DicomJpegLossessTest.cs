@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Imaging;
 using FellowOakDicom.Imaging.Codec;
@@ -8,7 +9,7 @@ using Xunit;
 namespace FellowOakDicom.Tests.Imaging
 {
 
-    [Collection("Imaging")]
+    [Collection(TestCollections.Imaging)]
     public class DicomJpegLossessTest
     {
 
@@ -35,6 +36,18 @@ namespace FellowOakDicom.Tests.Imaging
             Assert.IsType<DicomCodecException>(ex);
         }
 
+
+        [Fact]
+        void ExplicitByteToImplicitWord()
+        {
+            var file = DicomFile.Open(TestData.Resolve("1403-OB.dcm"));
+            var dicomTranscoder = new DicomTranscoder(file.Dataset.InternalTransferSyntax,
+                DicomTransferSyntax.ImplicitVRLittleEndian);
+            var newFile = dicomTranscoder.Transcode(file);
+            var dicomOtherWord = newFile.Dataset.GetDicomItem<DicomOtherWord>(DicomTag.PixelData);
+            var length = dicomOtherWord.Length;
+            Assert.True(length % 2 == 0);
+        }
 
     }
 }

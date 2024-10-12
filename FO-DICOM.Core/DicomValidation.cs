@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Linq;
@@ -120,7 +121,7 @@ namespace FellowOakDicom
 
             content=content.Trim();
             // This is not very inefficient - uses .NET regex caching
-            if (!Regex.IsMatch(content, "^[+-]?((0|[1-9][0-9]*)([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$"))
+            if (!Regex.IsMatch(content, @"^[+-]?((\d+(\.\d*)?)|(\.\d+))([eE][-+]?\d+)?$"))
             {
                 throw new DicomValidationException(content, DicomVR.DS, "value is no decimal string");
             }
@@ -673,6 +674,10 @@ namespace FellowOakDicom
             if (content.StartsWith("0") || Regex.IsMatch(content, @"[.]0\d"))
             {
                 throw new DicomValidationException(content, DicomVR.UI, "components must not have leading zeros");
+            }
+            if (Regex.IsMatch(content, @"^[.]") || Regex.IsMatch(content, @"[.][.]") || Regex.IsMatch(content, @"[.]$"))
+            {
+                throw new DicomValidationException(content, DicomVR.UI, "a component can not be empty");
             }
         }
 

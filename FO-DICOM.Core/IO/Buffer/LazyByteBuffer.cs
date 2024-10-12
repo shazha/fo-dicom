@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
+// Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
+
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,13 +12,15 @@ namespace FellowOakDicom.IO.Buffer
     public sealed class LazyByteBuffer : IByteBuffer
     {
         private readonly Func<byte[]> _bytes;
+        private byte[] _byteData;
+
 
         public LazyByteBuffer(Func<byte[]> bytes)
         {
             _bytes = bytes ?? throw new ArgumentNullException(nameof(bytes));
         }
 
-        private byte[] Bytes => _bytes();
+        private byte[] Bytes =>  _byteData ??= _bytes();
         
         public bool IsMemory => true;
 

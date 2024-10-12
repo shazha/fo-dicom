@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -7,8 +8,8 @@ using System.IO;
 using System.Linq;
 using FellowOakDicom.Imaging.Mathematics;
 using FellowOakDicom.IO;
-using FellowOakDicom.Log;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace FellowOakDicom.Printing
 {
@@ -21,7 +22,7 @@ namespace FellowOakDicom.Printing
         #region Properties and Attributes
 
         private static ILogger _logger;
-        private static ILogger Logger => _logger ?? (_logger = Setup.ServiceProvider.GetRequiredService<ILogManager>().GetLogger("FellowOakDicom.Printing"));
+        private static ILogger Logger => _logger ??= Setup.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(Log.LogCategories.Printing);
 
         private readonly FilmSession _filmSession = null;
 
@@ -480,11 +481,11 @@ namespace FellowOakDicom.Printing
             {
                 if (string.IsNullOrEmpty(ImageDisplayFormat))
                 {
-                    Logger.Error("No display format present in N-CREATE Basic Film Box dataset");
+                    Logger.LogError("No display format present in N-CREATE Basic Film Box dataset");
                     return false;
                 }
 
-                Logger.Info($"Applying display format {ImageDisplayFormat} for film box {SOPInstanceUID}");
+                Logger.LogInformation($"Applying display format {ImageDisplayFormat} for film box {SOPInstanceUID}");
 
                 var parts = ImageDisplayFormat.Split('\\');
 
@@ -525,7 +526,7 @@ namespace FellowOakDicom.Printing
             }
             catch (Exception ex)
             {
-                Logger.Error("FilmBox.Initialize, exception message: {0}", ex.Message);
+                Logger.LogError("FilmBox.Initialize, exception message: {0}", ex.Message);
             }
 
             return false;
@@ -738,7 +739,7 @@ namespace FellowOakDicom.Printing
 
             var filmBoxFile = Setup.ServiceProvider.GetService<IFileReferenceFactory>().Create(filmBoxTextFile);
             using var writer = new StreamWriter(filmBoxFile.Create());
-            writer.Write(this.WriteToString());
+            writer.Write(Log.Extensions.WriteToString(this));
 
             var imageBoxFolderInfo = new DirectoryReference(Path.Combine(filmBoxFolder, "Images"));
             imageBoxFolderInfo.Create();
@@ -764,7 +765,7 @@ namespace FellowOakDicom.Printing
             var filmBox = new FilmBox(filmSession, file.FileMetaInfo.MediaStorageSOPInstanceUID, file.Dataset);
 
             var imagesFolder = new DirectoryReference(Path.Combine(filmBoxFolder, "Images"));
-            foreach (var image in imagesFolder.EnumerateFileNames("*.dcm"))
+            foreach (var image in imagesFolder.EnumerateFileNames("*.dcm").OrderBy(i => i))
             {
                 var imageBox = ImageBox.Load(filmBox, image);
 

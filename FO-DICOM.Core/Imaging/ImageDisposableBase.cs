@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using FellowOakDicom.IO;
@@ -13,6 +14,7 @@ namespace FellowOakDicom.Imaging
     /// <typeparam name="TImage">Disposable image implementation type.</typeparam>
     public abstract class ImageDisposableBase<TImage> : ImageBase<TImage> where TImage : class, IDisposable
     {
+
         #region CONSTRUCTORS
 
         /// <summary>
@@ -32,7 +34,7 @@ namespace FellowOakDicom.Imaging
 		/// </summary>
 		~ImageDisposableBase()
 		{
-			this.Dispose(false);
+			Dispose(false);
 		}
 
         #endregion
@@ -45,21 +47,24 @@ namespace FellowOakDicom.Imaging
         /// <param name="disposing">Dispose mode?</param>
         protected override void Dispose(bool disposing)
         {
-            if (this.disposed) return;
-
-            if (this.image != null)
+            if (_disposed)
             {
-                this.image.Dispose();
-                this.image = null;
+                return;
             }
 
-            if (this.pixels != null)
+            if (_image != null)
             {
-                this.pixels.Dispose();
-                this.pixels = null;
+                _image.Dispose();
+                _image = null;
             }
 
-            this.disposed = true;
+            if (_pixels != null)
+            {
+                _pixels.Dispose();
+                _pixels = null;
+            }
+
+            _disposed = true;
         }
 
         #endregion

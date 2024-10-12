@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.IO;
@@ -115,7 +116,7 @@ namespace FellowOakDicom.IO.Buffer
 
             using var fs = _file.OpenRead();
 
-            await fs.CopyToAsync(stream);
+            await fs.CopyToAsync(stream).ConfigureAwait(false);
         }
 
         #endregion

@@ -1,21 +1,21 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using FellowOakDicom.Imaging.Codec;
-using FellowOakDicom.Log;
 using FellowOakDicom.Network;
 using FellowOakDicom.Network.Client;
 using FellowOakDicom.Tests.Helpers;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace FellowOakDicom.Tests.Network
 {
-    [Collection("Network"), Trait("Category", "Network")]
+    [Collection(TestCollections.Network), Trait(TestTraits.Category, TestCategories.Network)]
     public class AsyncDicomCStoreProviderTests
     {
         private readonly XUnitDicomLogger _logger;
@@ -47,8 +47,8 @@ namespace FellowOakDicom.Tests.Network
                     OnTimeout = (sender, args) => timeout = args
                 };
 
-                await client.AddRequestAsync(request).ConfigureAwait(false);
-                await client.SendAsync().ConfigureAwait(false);
+                await client.AddRequestAsync(request);
+                await client.SendAsync();
 
                 Assert.NotNull(response);
                 Assert.Equal(DicomStatus.Success, response.Status);
@@ -76,8 +76,8 @@ namespace FellowOakDicom.Tests.Network
                     numberOfContexts = e.Association.PresentationContexts.Count;
                     accpetedTS = e.Association.PresentationContexts.First().AcceptedTransferSyntax;
                 };
-                await client.AddRequestAsync(request).ConfigureAwait(false);
-                await client.SendAsync().ConfigureAwait(false);
+                await client.AddRequestAsync(request);
+                await client.SendAsync();
 
                 Assert.Equal(2, numberOfContexts); // one for the jpeg2k TS and one for the mandatory ImplicitLittleEndian
                 Assert.Equal(DicomTransferSyntax.JPEG2000Lossy, accpetedTS);
@@ -108,6 +108,8 @@ namespace FellowOakDicom.Tests.Network
                // Lossless
                DicomTransferSyntax.JPEGLSLossless,
                DicomTransferSyntax.JPEG2000Lossless,
+               DicomTransferSyntax.HTJ2KLossless,
+               DicomTransferSyntax.HTJ2KLosslessRPCL,
                DicomTransferSyntax.JPEGProcess14SV1,
                DicomTransferSyntax.JPEGProcess14,
                DicomTransferSyntax.RLELossless,
@@ -118,7 +120,7 @@ namespace FellowOakDicom.Tests.Network
                DicomTransferSyntax.JPEGProcess2_4,
         };
 
-        public AsyncDicomCStoreProviderPreferingUncompressedTS(INetworkStream stream, Encoding fallbackEncoding, Logger log, DicomServiceDependencies dependencies)
+        public AsyncDicomCStoreProviderPreferingUncompressedTS(INetworkStream stream, Encoding fallbackEncoding, ILogger log, DicomServiceDependencies dependencies)
             : base(stream, fallbackEncoding, log, dependencies)
         { }
 
@@ -144,7 +146,7 @@ namespace FellowOakDicom.Tests.Network
 
     public class AsyncDicomCStoreProvider : DicomService, IDicomServiceProvider, IDicomCStoreProvider
     {
-        public AsyncDicomCStoreProvider(INetworkStream stream, Encoding fallbackEncoding, Logger log,
+        public AsyncDicomCStoreProvider(INetworkStream stream, Encoding fallbackEncoding, ILogger log,
             DicomServiceDependencies dependencies)
             : base(stream, fallbackEncoding, log, dependencies)
         {
@@ -179,6 +181,7 @@ namespace FellowOakDicom.Tests.Network
 
         public async Task<DicomCStoreResponse> OnCStoreRequestAsync(DicomCStoreRequest request)
         {
+            await Task.Yield();
             return new DicomCStoreResponse(request, DicomStatus.Success);
         }
 

@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 namespace FellowOakDicom
 {
@@ -18,7 +19,9 @@ namespace FellowOakDicom
         {
             var df = new DicomFile();
             df.FileMetaInfo.Add(original.FileMetaInfo);
+            df.Dataset.ValidateItems = false;
             df.Dataset.Add(original.Dataset);
+            df.Dataset.ValidateItems = original.Dataset.ValidateItems;
             df.Dataset.InternalTransferSyntax = original.Dataset.InternalTransferSyntax;
             return df;
         }

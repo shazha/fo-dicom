@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
 using FellowOakDicom.Serialization;
@@ -12,6 +13,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -21,14 +23,16 @@ namespace FellowOakDicom.Tests.Serialization
     /// <summary>
     /// The json dicom converter test.
     /// </summary>
-    [Collection("General")]
+    [Collection(TestCollections.WithHttpClient)]
     public class JsonDicomConverterTest
     {
         private readonly ITestOutputHelper _output;
+        private readonly HttpClientFixture _httpClientFixture;
 
-        public JsonDicomConverterTest(ITestOutputHelper output)
+        public JsonDicomConverterTest(ITestOutputHelper output, HttpClientFixture httpClientFixture)
         {
-            _output = output;
+            _output = output ?? throw new ArgumentNullException(nameof(output));
+            _httpClientFixture = httpClientFixture ?? throw new ArgumentNullException(nameof(httpClientFixture));
         }
 
         /// <summary>
@@ -698,20 +702,27 @@ namespace FellowOakDicom.Tests.Serialization
             VerifyJsonTripleTrip(ds);
         }
 
-        private void DownloadBulkData(BulkDataUriByteBuffer bulkData)
+        private async Task DownloadBulkDataAsync(BulkDataUriByteBuffer bulkData)
         {
-            var request = WebRequest.Create(bulkData.BulkDataUri);
-            using var response = request.GetResponse();
-            using var responseStream = response.GetResponseStream();
-            bulkData.Data = new byte[response.ContentLength];
-            responseStream.Read(bulkData.Data, 0, (int)response.ContentLength);
+            var uri = new UriBuilder(bulkData.BulkDataUri);
+            switch (uri.Scheme)
+            {
+                case "file":
+                    bulkData.Data = File.ReadAllBytes(uri.Path);
+                    break;
+                case "http":
+                case "https":
+                    var httpClient = _httpClientFixture.HttpClient;
+                    bulkData.Data = await httpClient.GetByteArrayAsync(bulkData.BulkDataUri);
+                    return;
+            }
         }
 
         /// <summary>
         /// The bulk data read.
         /// </summary>
         [Fact]
-        public void BulkDataRead()
+        public async Task BulkDataRead()
         {
             File.WriteAllText("test.txt", "xxx!");
             var path = Path.GetFullPath("test.txt");
@@ -726,8 +737,8 @@ namespace FellowOakDicom.Tests.Serialization
             var json2 = JsonConvert.SerializeObject(reconstituated, Formatting.Indented, new JsonDicomConverter());
             Assert.Equal(json, json2);
 
-            DownloadBulkData(reconstituated.GetDicomItem<DicomElement>(DicomTag.PixelData).Buffer as BulkDataUriByteBuffer);
-            DownloadBulkData(bulkData);
+            await DownloadBulkDataAsync(reconstituated.GetDicomItem<DicomElement>(DicomTag.PixelData).Buffer as BulkDataUriByteBuffer);
+            await DownloadBulkDataAsync(bulkData);
 
             Assert.True(ValueEquals(target, reconstituated));
 
@@ -985,14 +996,15 @@ namespace FellowOakDicom.Tests.Serialization
         {
             var target = new DicomDataset
                            {
-                             new DicomPersonName(DicomTag.PatientName, new[] { "Anna^Pelle", null, "Olle^Jöns^Pyjamas" }),
+                               new DicomPersonName(DicomTag.PatientName, new[] { "Doe^John" }),
+                               new DicomPersonName(DicomTag.OtherPatientNames, new[] { "Anna^Pelle", null, "Olle^Jöns^Pyjamas" }),
                              { DicomTag.SOPClassUID, DicomUID.RTPlanStorage },
                              { DicomTag.SOPInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID() },
                              { DicomTag.SeriesInstanceUID, Array.Empty<DicomUID>() },
                              { DicomTag.DoseType, new[] { "HEJ" } },
+                             { DicomTag.ControlPointSequence, (DicomSequence[])null }
                            };
 
-            target.Add(DicomTag.ControlPointSequence, (DicomSequence[])null);
             var beams = new[] { 1, 2, 3 }.Select(beamNumber =>
             {
                 var beam = new DicomDataset
@@ -1056,7 +1068,7 @@ namespace FellowOakDicom.Tests.Serialization
             {
                 { DicomTag.Modality, "CT" },
                 new DicomCodeString(privTag1, "TESTA"),
-                { privTag2, "TESTB" },
+                { DicomVR.LO, privTag2, "TESTB" },
             };
 
             var json = JsonConvert.SerializeObject(ds, new JsonDicomConverter());
@@ -1151,14 +1163,16 @@ namespace FellowOakDicom.Tests.Serialization
             var dataset = new DicomDataset().NotValidated();
             const string invalidDS = "InvalidDS";
             const string invalidIS = "InvalidIS";
+            const string invalidISThatThrowsOverflowException = "73.8";
             dataset.Add(new DicomDecimalString(DicomTag.PatientSize, new MemoryByteBuffer(Encoding.ASCII.GetBytes(invalidDS))));
             dataset.Add(new DicomIntegerString(DicomTag.ReferencedFrameNumber, new MemoryByteBuffer(Encoding.ASCII.GetBytes(invalidIS))));
+            dataset.Add(new DicomIntegerString(DicomTag.Exposure, new MemoryByteBuffer(Encoding.ASCII.GetBytes(invalidISThatThrowsOverflowException))));
             var json = JsonConvert.SerializeObject(dataset, new JsonDicomConverter(numberSerializationMode: NumberSerializationMode.PreferablyAsNumber));
-            Assert.Equal("{\"00081160\":{\"vr\":\"IS\",\"Value\":[\"InvalidIS\"]},\"00101020\":{\"vr\":\"DS\",\"Value\":[\"InvalidDS\"]}}", json);
+            Assert.Equal("{\"00081160\":{\"vr\":\"IS\",\"Value\":[\"InvalidIS\"]},\"00101020\":{\"vr\":\"DS\",\"Value\":[\"InvalidDS\"]},\"00181152\":{\"vr\":\"IS\",\"Value\":[\"73.8\"]}}", json);
         }
 
         [Fact]
-        public static void GivenInvalidValueForDS_WhenNumberSerializationModeAsNumber_ThenDeserializationShouldThrowError()
+        public static void GivenInvalidValueForDS_WhenNumberSerializationModeAsNumber_ThenDeserializationShouldThrowFormatException()
         {
             var dataset = new DicomDataset().NotValidated();
             const string invalidNumber = "InvalidNumber";
@@ -1167,12 +1181,21 @@ namespace FellowOakDicom.Tests.Serialization
         }
 
         [Fact]
-        public static void GivenInvalidValueForIS_WhenNumberSerializationModeAsNumber_ThenDeserializationShouldThrowError()
+        public static void GivenInvalidValueForIS_WhenNumberSerializationModeAsNumber_ThenDeserializationShouldThrowFormatException()
         {
             var dataset = new DicomDataset().NotValidated();
             const string invalidNumber = "InvalidNumber";
             dataset.Add(new DicomIntegerString(DicomTag.ReferencedFrameNumber, new MemoryByteBuffer(Encoding.ASCII.GetBytes(invalidNumber))));
             Assert.Throws<FormatException>(() => JsonConvert.SerializeObject(dataset, new JsonDicomConverter(numberSerializationMode: NumberSerializationMode.AsNumber)));
+        }
+
+        [Fact]
+        public static void GivenInvalidValueForIS_WhenNumberSerializationModeAsNumber_ThenDeserializationShouldThrowOverflowException()
+        {
+            var dataset = new DicomDataset().NotValidated();
+            const string invalidNumber = "2147483647500";
+            dataset.Add(new DicomIntegerString(DicomTag.Exposure, new MemoryByteBuffer(Encoding.ASCII.GetBytes(invalidNumber))));
+            Assert.Throws<OverflowException>(() => JsonConvert.SerializeObject(dataset, new JsonDicomConverter(numberSerializationMode: NumberSerializationMode.AsNumber)));
         }
 
         [Fact]
@@ -1242,6 +1265,32 @@ namespace FellowOakDicom.Tests.Serialization
             dataset.Add(new DicomIntegerString(DicomTag.ReferencedFrameNumber, validNumber, invalidNumber));
             var json = JsonConvert.SerializeObject(dataset, new JsonDicomConverter(numberSerializationMode: NumberSerializationMode.PreferablyAsNumber));
             Assert.Equal("{\"00081160\":{\"vr\":\"IS\",\"Value\":[\"299792458\",\"InvalidNumber\"]}}", json);
+        }
+
+        [Fact]
+        public static void GivenDicomJsonDatasetWithInvalidPrivateCreatorDataElement_WhenDeserialized_IsSuccessful()
+        {
+            // allowing deserializer to handle bad data private creator data more gracefully
+            const string json = @"
+            {
+                ""00090010"": {
+                    ""vr"": ""US"",
+                     ""Value"": [
+                        1234,
+                        3333
+                    ]
+                 },
+                ""00091001"": {
+                    ""vr"": ""CS"",
+                    ""Value"": [
+                        ""00""
+                    ]
+                }
+            } ";
+
+            // make sure below serialization does not throw
+            var ds = JsonConvert.DeserializeObject<DicomDataset>(json, new JsonDicomConverter(autoValidate: false));
+            Assert.NotNull(ds);
         }
 
         #region Sample Data

@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Imaging;
 using FellowOakDicom.IO.Buffer;
@@ -14,7 +15,7 @@ using Xunit;
 namespace FellowOakDicom.Tests
 {
 
-    [Collection("General")]
+    [Collection(TestCollections.General)]
     public class DicomDatasetTest
     {
         #region Unit tests
@@ -438,17 +439,57 @@ namespace FellowOakDicom.Tests
 
             var ds = new DicomDataset
             {
-                { dictEntry.Tag, "VAL1" }
+                {DicomVR.CS, dictEntry.Tag, "VAL1" }
             };
             Assert.Equal(DicomVR.CS, ds.GetDicomItem<DicomItem>(dictEntry.Tag).ValueRepresentation);
+        }
+
+        /// <summary>
+        /// Associated with Github issue #1454
+        /// </summary>
+        [Theory]
+        [InlineData(0.142916000000001)]
+        [InlineData(0.142916)]
+        [InlineData(12345678901234.1)]
+        [InlineData(123456789112345.6)]
+        [InlineData(1234567891123456)]
+        [InlineData(1234567891123456789)]
+        [InlineData(123456789112345)]
+        [InlineData(0.123456789112345)]
+        [InlineData(0.12345678911234)]
+        [InlineData(0.1234567891123)]
+        [InlineData(5.23e-16)]
+        public void Add_AnyDecimalValue_IsStoredWithExpectedPrecision(decimal value)
+        {
+            var tag = DicomTag.MaterialThickness;
+            var negativeTag = DicomTag.TableTopLateralPosition;
+            DicomDataset dataSet = null;
+            var exception = Record.Exception(() =>
+            {
+                dataSet = new DicomDataset
+                {
+                    { tag, value },
+                    { negativeTag, -value }
+                };
+            });
+
+            // Assert
+            Assert.Null(exception);
+
+            var actualValue = dataSet.GetSingleValue<decimal>(tag);
+            var actualNegativeValue = dataSet.GetSingleValue<decimal>(negativeTag);
+            var expectedDelta = 1E-10m * Math.Abs(value);
+            var comparer = new DecimalDeltaComparer(expectedDelta);
+            Assert.Equal(value, actualValue, comparer);
+            Assert.Equal(-value, actualNegativeValue, comparer);
         }
 
         /// <summary>
         /// Associated with Github issue #535.
         /// </summary>
         [Theory]
-        [InlineData(0x0016, 0x1106, 0x1053)]
-        [InlineData(0x0016, 0x1053, 0x1006)]
+        [InlineData(0x0016, 0x0018, 0x000F)]
+        [InlineData(0x0016, 0x000F, 0x000E)]
         public void Add_RegularTags_ShouldBeSortedInGroupElementOrder(ushort group, ushort hiElem, ushort loElem)
         {
             var dataset = new DicomDataset
@@ -476,8 +517,8 @@ namespace FellowOakDicom.Tests
         {
             var dataset = new DicomDataset
             {
-                { new DicomTag(group, hiElem, hiCreator), 2 },
-                { new DicomTag(group, loElem, loCreator), 1 }
+                { DicomVR.IS, new DicomTag(group, hiElem, hiCreator), 2 },
+                { DicomVR.IS, new DicomTag(group, loElem, loCreator), 1 }
             };
 
             var firstElem = dataset.First().Tag.Element;
@@ -499,7 +540,7 @@ namespace FellowOakDicom.Tests
 
             var dataset = new DicomDataset
             {
-                { tag1Private, 1 }
+                { DicomVR.IS, tag1Private, 1 }
             };
 
             var item1 = dataset.SingleOrDefault(item => item.Tag.Group == tag1Private.Group &&
@@ -518,8 +559,8 @@ namespace FellowOakDicom.Tests
 
             // By using the .Add(DicomTag, ...) method, private tags get automatically updated so that a private
             // creator group number is generated (if private creator is new) and inserted into the tag element.
-            dataset.Add(tag1, 1);
-            dataset.Add(tag2, 3.14);
+            dataset.Add(DicomVR.IS, tag1, 1);
+            dataset.Add(DicomVR.FD, tag2, 3.14);
 
             // Should confirm that element of the tag is not updated to include the private creator group number.
             dataset.Add(new DicomIntegerString(tag3, 50));
@@ -544,9 +585,9 @@ namespace FellowOakDicom.Tests
 
             // By using the .Add(DicomTag, ...) method, private tags get automatically updated so that a private
             // creator group number is generated (if private creator is new) and inserted into the tag element.
-            dataset.Add(tag1, 1);
-            dataset.Add(tag2, 3.14);
-            dataset.Add(tag3, "COOL");
+            dataset.Add(DicomVR.IS, tag1, 1);
+            dataset.Add(DicomVR.FD, tag2, 3.14);
+            dataset.Add(DicomVR.LO, tag3, "COOL");
 
             var tag1Private = dataset.GetPrivateTag(tag1);
             var contained = dataset.SingleOrDefault(item => item.Tag.Group == tag1Private.Group &&
@@ -562,6 +603,94 @@ namespace FellowOakDicom.Tests
 
             var thirdItem = dataset.ElementAt(2);
             Assert.Equal(thirdItem, contained);
+        }
+
+        [Fact]
+        public void Add_PrivateTagWithoutExplicitVR_ShouldThrow()
+        {
+            var dataset = new DicomDataset();
+
+            var privateTag = new DicomTag(0x3001, 0x08, "PRIVATE");
+
+            var e = Record.Exception(() => dataset.Add<string>(privateTag, "FO-DICOM"));
+            Assert.IsType<DicomDataException>(e);
+        }
+
+        [Fact]
+        public void Add_UnknownPrivateTagWithExplicitVR_ShouldBeAdded()
+        {
+            var dataset = new DicomDataset();
+
+            var privateTag = new DicomTag(0x3001, 0x08);
+
+            dataset.Add<string>(DicomVR.LO, privateTag, "FO-DICOM");
+
+            Assert.Equal(privateTag, dataset.GetDicomItem<DicomItem>(privateTag).Tag);
+        }
+
+        [Fact]
+        public void Add_KnownPrivateTagWithoutExplicitVR_ShouldBeAdded()
+        {
+            var dataset = new DicomDataset();
+
+            // <tag group="0019" element="100d" vr="DS" vm="1">AP Offcenter</tag> is known private tag
+            var privateTag = new DicomTag(0x0019, 0x100a, "PHILIPS MR/PART");
+
+            dataset.Add<int>(privateTag, 1);
+
+            Assert.Equal(privateTag, dataset.GetDicomItem<DicomItem>(privateTag).Tag);
+        }
+
+        [Fact]
+        public void AddOrUpdate_PrivateTagWithoutExplicitVR_ShouldThrow()
+        {
+            var dataset = new DicomDataset();
+
+            var privateTag = new DicomTag(0x3001, 0x08, "PRIVATE");
+
+            var e = Record.Exception(() => dataset.AddOrUpdate<string>(privateTag, "FO-DICOM"));
+            Assert.IsType<DicomDataException>(e);
+        }
+
+        [Fact]
+        public void AddOrUpdate_UnknownPrivateTagWithExplicitVR_ShouldBeAdded()
+        {
+            var dataset = new DicomDataset();
+
+            var privateTag = new DicomTag(0x3001, 0x08);
+
+            dataset.AddOrUpdate<string>(DicomVR.LO, privateTag, "FO-DICOM");
+
+            Assert.Equal(privateTag, dataset.GetDicomItem<DicomItem>(privateTag).Tag);
+        }
+
+        [Fact]
+        public void AddOrUpdate_KnownPrivateTagWithoutExplicitVR_ShouldBeAdded()
+        {
+            var dataset = new DicomDataset();
+
+            // <tag group="0019" element="100d" vr="DS" vm="1">AP Offcenter</tag> is known private tag
+            var privateTag = new DicomTag(0x0019, 0x100a, "PHILIPS MR/PART");
+
+            dataset.AddOrUpdate<int>(privateTag, 1);
+
+            Assert.Equal(privateTag, dataset.GetDicomItem<DicomItem>(privateTag).Tag);
+        }
+
+        [Fact]
+        public void Get_NonExistingPrivateTag_ShouldNotThrow()
+        {
+            var dataset = new DicomDataset();
+
+            // <tag group="0019" element="100d" vr="DS" vm="1">AP Offcenter</tag> is known private tag
+            var privateTagWithExplicitElement = new DicomTag(0x0019, 0x100a);
+            var privateTagWithPrivateCreator = new DicomTag(0x0019, 0x000a, "PHILIPS MR/PART");
+
+            var item = dataset.GetDicomItem<DicomItem>(privateTagWithExplicitElement);
+            Assert.Null(item);
+
+            item = dataset.GetDicomItem<DicomItem>(privateTagWithPrivateCreator);
+            Assert.Null(item);
         }
 
         [Fact]
@@ -851,6 +980,14 @@ namespace FellowOakDicom.Tests
                 Assert.Equal(testValues[index], ds.GetValue<T>(element.Tag, index));
             }
             return true;
+        }
+
+        private class DecimalDeltaComparer : IEqualityComparer<decimal>
+        {
+            private readonly decimal _delta;
+            public DecimalDeltaComparer(decimal delta) { _delta = delta; }
+            public bool Equals(decimal x, decimal y) => Math.Abs(x - y) < _delta;
+            public int GetHashCode(decimal obj) => throw new NotImplementedException();
         }
 
         #endregion

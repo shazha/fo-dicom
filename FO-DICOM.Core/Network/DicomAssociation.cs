@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using System.Linq;
 using System.Text;
@@ -95,6 +96,11 @@ namespace FellowOakDicom.Network
         public DicomServiceOptions Options { get; internal set; }
 
         /// <summary>
+        /// Gets or sets the user identity negotiation information
+        /// </summary>
+        public DicomUserIdentityNegotiation UserIdentityNegotiation { get; internal set; }
+
+        /// <summary>
         /// Returns a string that represents the current object.
         /// </summary>
         /// <returns>
@@ -114,6 +120,11 @@ namespace FellowOakDicom.Network
             sb.AppendFormat("Async Ops Invoked:      {0}\n", MaxAsyncOpsInvoked);
             sb.AppendFormat("Async Ops Performed:    {0}\n", MaxAsyncOpsPerformed);
             sb.AppendFormat("Presentation Contexts:  {0}\n", PresentationContexts.Count);
+            if (UserIdentityNegotiation != null && UserIdentityNegotiation.UserIdentityType.HasValue)
+            { 
+                sb.AppendFormat("User Identity:          {0}\n", UserIdentityNegotiation.UserIdentityType.ToString());
+            }
+
             foreach (var pc in PresentationContexts)
             {
                 sb.AppendFormat("  Presentation Context:  {0} [{1}]\n", pc.ID, pc.Result);
@@ -187,7 +198,8 @@ namespace FellowOakDicom.Network
                 MaxAsyncOpsPerformed = MaxAsyncOpsPerformed,
                 RemoteImplementationVersion = RemoteImplementationVersion,
                 RemoteImplementationClassUID = RemoteImplementationClassUID,
-                MaximumPDULength = MaximumPDULength
+                MaximumPDULength = MaximumPDULength,
+                UserIdentityNegotiation = UserIdentityNegotiation
             };
 
             foreach (var presentationContext in PresentationContexts)

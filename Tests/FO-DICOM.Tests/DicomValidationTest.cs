@@ -1,15 +1,18 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
-using System;
 using FellowOakDicom.Tests.Helpers;
 using System.IO;
 using Xunit;
 
+// These tests cover some obsolete properties such as AutoValidate
+#pragma warning disable CS0618
+
 namespace FellowOakDicom.Tests
 {
 
-    [Collection("Validation")]
+    [Collection(TestCollections.Validation)]
     public class DicomValidationTest
     {
 
@@ -67,6 +70,18 @@ namespace FellowOakDicom.Tests
             var leadingZeroUid = validUid + ".03";
             var ex2 = Assert.ThrowsAny<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.SeriesInstanceUID, leadingZeroUid));
             Assert.Contains("leading zero", ex2.Message);
+
+            var emptyComponentUid = validUid + ".";
+            var ex3 = Assert.ThrowsAny<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.SeriesInstanceUID, emptyComponentUid));
+            Assert.Contains("not be empty", ex3.Message);
+
+            var emptyComponent2Uid = validUid + ".2..3459.123";
+            var ex4 = Assert.ThrowsAny<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.SeriesInstanceUID, emptyComponent2Uid));
+            Assert.Contains("not be empty", ex4.Message);
+
+            var emptyComponent3Uid = "." + validUid;
+            var ex5 = Assert.ThrowsAny<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.SeriesInstanceUID, emptyComponent3Uid));
+            Assert.Contains("not be empty", ex5.Message);
         }
 
         [Fact]
@@ -96,18 +111,34 @@ namespace FellowOakDicom.Tests
             Assert.Throws<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.ReferencedFileID, "HUGOHUGOHUGOHUGO1"));
         }
 
-        [Fact]
-        public void DicomValidation_ValidateDS()
+        [Theory]
+        [InlineData("0.333333333333  ")] // 16 chars
+        [InlineData("0001024.0  ")] // leading zeros
+        [InlineData(".0123")] // leading dot
+        [InlineData("12345.")] // trailing dot
+        [InlineData("71e-43")] // scientific notation
+        [InlineData("-71e-43")] // scientific notation, negative value
+        [InlineData("+71.123e+21")] // leading plus
+        public void DicomValidation_ValidateValidDS(string value)
+        {
+            var ds = new DicomDataset { { DicomTag.RescaleSlope, value } };
+            Assert.Equal(value, ds.GetSingleValue<string>(DicomTag.RescaleSlope));
+        }
+        
+        [Theory]
+        [InlineData("0.333333333333   ")] // 17 chars
+        [InlineData(".")] // single dot
+        [InlineData(".e25")] // scientific notation, single dot
+        [InlineData("-323.456e-4.5")] // floating value exponent
+        [InlineData("54e34e2")] // double exponent
+        [InlineData("-43e")] // missing exponent
+        [InlineData("--323")] // double minus
+        public void DicomValidation_ValidateInvalidDS(string value)
         {
             var ds = new DicomDataset();
-            var validDS = "0.333333333333  "; // 16 chars
-            ds.Add(DicomTag.RescaleSlope, validDS);
-            Assert.Equal(validDS, ds.GetSingleValue<string>(DicomTag.RescaleSlope));
-
-            var notValidDS = "0.333333333333   "; // 17 chars
-            Assert.Throws<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.RescaleSlope, notValidDS));
+            Assert.Throws<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.RescaleSlope, value));
         }
-
+        
         [Fact]
         public void AddInvalidUIDMultiplicity()
         {
@@ -244,6 +275,36 @@ namespace FellowOakDicom.Tests
             Assert.Throws<DicomValidationException>(() => ds.AddOrUpdate(DicomTag.ScheduledProcedureStepStartDateTime, $"20081-200812{zone}"));
         }
 
+        [Fact]
+        public void DicomValidation_ValidatePN()
+        {
+            var ds = new DicomDataset { { DicomTag.PatientName, "Doe^John=Doe^John=Doe^John" } };
+            // PatientName has VM 1
+            Assert.Throws<DicomValidationException>(() => 
+                ds.AddOrUpdate(DicomTag.PatientName, "Doe^John", "Doe^John"));
+            // OtherPatientNames has VM 1-n
+            ds.AddOrUpdate(DicomTag.OtherPatientNames, "Doe^John", "Doe^John");
+            // more than 3 component groups
+            Assert.Throws<DicomValidationException>(() => 
+                ds.AddOrUpdate(DicomTag.ReferringPhysicianName, "Doe^Jane=Doe^Jane=Doe^Jane=Doe^Jane"));
+            // more than 5 components
+            Assert.Throws<DicomValidationException>(() => 
+                ds.AddOrUpdate(DicomTag.ReferringPhysicianName, "Doe^John^^^Ph.D.^Junior"));
+        }
+
+        [Fact]
+        public void DicomValidation_ValidatePNLength()
+        {
+            // normal Length
+            var ds = new DicomDataset { { DicomTag.PatientName, "Doe^John=Doe^John=Doe^John" } };
+
+            // Length of one component group increases 64 characters
+            Assert.Throws<DicomValidationException>(() =>
+                ds.AddOrUpdate(DicomTag.PatientName, "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery^Long"));
+
+            // 2 component groups, each of them shorter than 64 characters, but together more than 64 characters
+            ds.AddOrUpdate(DicomTag.OtherPatientNames, "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery^Long=VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery^Long");
+        }
 
         #endregion
 

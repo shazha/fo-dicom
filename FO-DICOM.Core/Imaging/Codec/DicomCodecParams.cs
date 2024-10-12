@@ -1,8 +1,9 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
-using FellowOakDicom.Log;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace FellowOakDicom.Imaging.Codec
 {
@@ -17,7 +18,7 @@ namespace FellowOakDicom.Imaging.Codec
         /// </summary>
         protected DicomCodecParams()
         {
-            this.Logger = Setup.ServiceProvider.GetRequiredService<ILogManager>().GetLogger("FellowOakDicom.Imaging.Codec");
+            Logger = Setup.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(FellowOakDicom.Log.LogCategories.Codec);
         }
 
         /// <summary>

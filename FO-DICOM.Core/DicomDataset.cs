@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.IO.Buffer;
 using FellowOakDicom.StructuredReport;
@@ -16,14 +17,24 @@ namespace FellowOakDicom
     /// <summary>
     /// A collection of <see cref="DicomItem">DICOM items</see>.
     /// </summary>
-    public partial class DicomDataset : IEnumerable<DicomItem>
+    public partial class DicomDataset : IEnumerable<DicomItem>, IEquatable<DicomDataset>
     {
+        #region Static Properties
+
+        /// <summary>
+        /// Gets or sets how two DicomDatasets are compared if dataset1 == dataset2 is called
+        /// If this property is true, then all items are iterated and the content is compared. Then two DicomDatasets are equal if the content is equal.
+        /// If this property is false, then the equalitycheck tests if the DicomDatasets are the same instance.
+        /// </summary>
+        public static bool CompareInstancesByContent { get; set; } = true;
+
+        #endregion
+
         #region FIELDS
 
         private readonly IDictionary<DicomTag, DicomItem> _items;
 
         private DicomTransferSyntax _syntax;
-        private Encoding[] _fallbackEncodings = DicomEncoding.DefaultArray;
 
         #endregion
 
@@ -43,7 +54,7 @@ namespace FellowOakDicom
         /// <param name="internalTransferSyntax">Internal transfer syntax representation of the dataset.</param>
         public DicomDataset(DicomTransferSyntax internalTransferSyntax)
         {
-            _items = new SortedDictionary<DicomTag, DicomItem>();
+            _items = new SortedList<DicomTag, DicomItem>();
             InternalTransferSyntax = internalTransferSyntax;
         }
 
@@ -127,13 +138,10 @@ namespace FellowOakDicom
         }
 
         /// <summary>
-        /// Sets the fallback encodings that are used for string-based values if the dataset does not contain an explicit SpecificCharacterSet entry.
+        /// Gets or sets the fallback encodings that are used for string-based values if the dataset does not contain an explicit SpecificCharacterSet entry.
         /// This value is set before serializing the Dataset into a stream and when some encodings are inherited from parent datasets.
         /// </summary>
-        internal void SetFallbackEncodings(Encoding[] value)
-        {
-            _fallbackEncodings = value;
-        }
+        internal Encoding[] FallbackEncodings { get; set; } = DicomEncoding.DefaultArray;
 
         /// <summary>
         /// Gets the encodings used for string-based values by evaluating SpecificCharacterSet value or by using the fallback-encoding if there is no explicit Tag.
@@ -144,7 +152,7 @@ namespace FellowOakDicom
         {
             return TryGetValues<string>(DicomTag.SpecificCharacterSet, out var charsets)
                 ? DicomEncoding.GetEncodings(charsets)
-                : _fallbackEncodings;
+                : FallbackEncodings;
         }
 
 
@@ -177,10 +185,11 @@ namespace FellowOakDicom
         /// <typeparam name="T">Type of the return value. Must inherit from <see cref="DicomItem"/>.</typeparam>
         /// <param name="tag">Requested DICOM tag.</param>
         /// <returns>Item corresponding to <paramref name="tag"/> or <code>null</code> if the <paramref name="tag"/> is not contained in the instance.</returns>
-        public T GetDicomItem<T>(DicomTag tag) where T:DicomItem
+        public T GetDicomItem<T>(DicomTag tag) where T : DicomItem
         {
-            tag = ValidatePrivate(tag);
-            return _items.TryGetValue(tag, out DicomItem dummyItem) ? dummyItem as T : null;
+            return (TryValidatePrivate(ref tag) && _items.TryGetValue(tag, out DicomItem dummyItem))
+              ? dummyItem as T
+              : null;
         }
 
 
@@ -299,7 +308,7 @@ namespace FellowOakDicom
             }
         }
 
- 
+
         /// <summary>
         /// Gets the sequence of the specified <paramref name="tag"/> if it exists and is not empty.
         /// </summary>
@@ -318,7 +327,7 @@ namespace FellowOakDicom
             return false;
         }
 
- 
+
         /// <summary>        
         /// Returns the number of values in the specified <paramref name="tag"/>.
         /// </summary>
@@ -366,7 +375,7 @@ namespace FellowOakDicom
             {
                 if (typeof(IByteBuffer).GetTypeInfo().IsAssignableFrom(typeof(T).GetTypeInfo())) { return (T)(object)element.Buffer; }
 
-                if (index >= element.Count )
+                if (index >= element.Count)
                 {
                     throw new DicomDataException($"Index out of range: index {index} for Tag {tag} must be less than value count {element.Count}");
                 }
@@ -470,6 +479,7 @@ namespace FellowOakDicom
         }
 
 
+
         /// <summary>
         /// Tries to get the array of element values of the specified <paramref name="tag"/>.
         /// </summary>
@@ -479,7 +489,8 @@ namespace FellowOakDicom
         /// <returns>Returns <code>true</code> if the element values could be extracted, otherwise <code>false</code>.</returns>
         public bool TryGetValues<T>(DicomTag tag, out T[] values)
         {
-            if (typeof(T).GetTypeInfo().IsArray) {
+            if (typeof(T).GetTypeInfo().IsArray)
+            {
                 values = null;
                 return false;
             }
@@ -516,6 +527,7 @@ namespace FellowOakDicom
         }
 
 
+
         /// <summary>
         /// Gets the element value of the specified <paramref name="tag"/>, whose value multiplicity has to be 1.
         /// </summary>
@@ -543,6 +555,7 @@ namespace FellowOakDicom
                 throw new DicomDataException("DicomTag doesn't support values.");
             }
         }
+
 
 
         /// <summary>
@@ -649,9 +662,9 @@ namespace FellowOakDicom
             {
                 try
                 {
-                    stringValue = 
-                        element.Count == 0 
-                        ? string.Empty 
+                    stringValue =
+                        element.Count == 0
+                        ? string.Empty
                         : element.Get<string>(-1);
                     return true;
                 }
@@ -667,7 +680,6 @@ namespace FellowOakDicom
                 return false;
             }
         }
-
 
         private DicomTag ValidatePrivate(DicomTag tag)
         {
@@ -705,24 +717,6 @@ namespace FellowOakDicom
             }
         }
 
-
-        #endregion
-
-
-        #region METHODS
-
-        /// <summary>
-        /// Performs a validation of all DICOM items that are contained in this DicomDataset. This explicit call for validation ignores the
-        /// gobal DicomValidation.AutoValidate and DicomDataset.AutoValidate property.
-        /// </summary>
-        /// <exception cref="DicomValidationException">A exception is thrown if one of the items does not pass the valiation</exception>
-        public void Validate()
-        {
-            foreach(var item in this)
-            {
-                item.Validate();
-            }
-        }
 
         /// <summary>
         /// Converts a dictionary tag to a valid private tag. Creates the private creator tag if needed.
@@ -774,12 +768,118 @@ namespace FellowOakDicom
             return null;
         }
 
+
+        /// <summary>
+        /// Checks the DICOM dataset to determine if the dataset already contains an item with the specified tag.
+        /// </summary>
+        /// <param name="tag">DICOM tag to test</param>
+        /// <returns><c>True</c> if a DICOM item with the specified tag already exists.</returns>
+        public bool Contains(DicomTag tag)
+        {
+            if (tag.IsPrivate)
+            {
+                var privateTag = GetPrivateTag(tag, false);
+                return (privateTag != null) && _items.Any(kv => kv.Key.Equals(privateTag));
+            }
+            return _items.ContainsKey(tag);
+        }
+
+
+
+        public DicomDataset FunctionalGroupValues(int frame)
+        {
+            // If validation is disabled on the current data set
+            // it should also be disabled on the new dataset we create here
+            // because we will be copying data over from one to the other
+            var functionalDs = new DicomDataset { ValidateItems = ValidateItems };
+
+            // gets all items from SharedFunctionalGroups
+            if (TryGetSequence(DicomTag.SharedFunctionalGroupsSequence, out var sharedFunctionalGroupsSequence))
+            {
+                var sharedFunctionGroupItem = sharedFunctionalGroupsSequence.Items[0] ?? throw new DicomDataException("unexpected empty SharedFunctionalGroupsSequence");
+                foreach (var sequence in sharedFunctionGroupItem.OfType<DicomSequence>())
+                {
+                    if (sequence.Tag == DicomTag.ReferencedImageSequence)
+                    {
+                        functionalDs.AddOrUpdate(sequence);
+                    }
+                    else
+                    {
+                        // skip empty sequences
+                        if (sequence.Items.Count > 0)
+                        {
+                            foreach (var item in sequence.Items[0])
+                            {
+                                functionalDs.AddOrUpdate(item);
+                            }
+                        }
+                    }
+                }
+            }
+            if (TryGetSequence(DicomTag.PerFrameFunctionalGroupsSequence, out var perFrameFunctionalGroupsSequence)
+                && perFrameFunctionalGroupsSequence.Items.Count > frame)
+            {
+                var frameFunctionGroupItem = perFrameFunctionalGroupsSequence.Items[frame];
+                foreach (var sequence in frameFunctionGroupItem.OfType<DicomSequence>())
+                {
+                    if (sequence.Tag == DicomTag.ReferencedImageSequence)
+                    {
+                        functionalDs.AddOrUpdate(sequence);
+                    }
+                    else
+                    {
+                        // skip empty sequences
+                        if (sequence.Items.Count > 0)
+                        {
+                            foreach (var item in sequence.Items[0])
+                            {
+                                functionalDs.AddOrUpdate(item);
+                            }
+                        }
+                    }
+                }
+
+            }
+            return functionalDs;
+        }
+
+
+        #endregion
+
+
+        #region METHODS
+
+        /// <summary>
+        /// Performs a validation of all DICOM items that are contained in this DicomDataset. This explicit call for validation ignores the
+        /// gobal DicomValidation.AutoValidate and DicomDataset.AutoValidate property.
+        /// </summary>
+        /// <exception cref="DicomValidationException">A exception is thrown if one of the items does not pass the valiation</exception>
+        public void Validate()
+        {
+            foreach (var item in this)
+            {
+                item.Validate();
+            }
+        }
+
+
+        /// <summary>
+        /// Adds a DICOM item to the dataset.
+        /// </summary>
+        /// <param name="item">DICOM item to add.</param>
+        /// <returns>The dataset instance.</returns>
+        /// <exception cref="System.ArgumentException">If tag of added item already exists in dataset.</exception>
+        public DicomDataset Add(DicomItem item)
+        {
+            return DoAdd(item, false);
+        }
+
         /// <summary>
         /// Add a collection of DICOM items to the dataset.
         /// </summary>
         /// <param name="items">Collection of DICOM items to add.</param>
         /// <returns>The dataset instance.</returns>
-        /// <exception cref="ArgumentException">If tag of added item already exists in dataset.</exception>
+        /// <exception cref="System.ArgumentException">If tag of added item already exists in dataset.</exception>
         public DicomDataset Add(params DicomItem[] items)
         {
             return DoAdd(items, false);
@@ -790,7 +890,7 @@ namespace FellowOakDicom
         /// </summary>
         /// <param name="items">Collection of DICOM items to add.</param>
         /// <returns>The dataset instance.</returns>
-        /// <exception cref="ArgumentException">If tag of added item already exists in dataset.</exception>
+        /// <exception cref="System.ArgumentException">If tag of added item already exists in dataset.</exception>
         public DicomDataset Add(IEnumerable<DicomItem> items)
         {
             return DoAdd(items, false);
@@ -803,7 +903,7 @@ namespace FellowOakDicom
         /// <param name="tag">DICOM tag of the added item.</param>
         /// <param name="values">Values of the added item.</param>
         /// <returns>The dataset instance.</returns>
-        /// <exception cref="ArgumentException">If tag already exists in dataset.</exception>
+        /// <exception cref="System.ArgumentException">If tag already exists in dataset.</exception>
         public DicomDataset Add<T>(DicomTag tag, params T[] values)
         {
             return DoAdd(tag, values, false);
@@ -820,7 +920,7 @@ namespace FellowOakDicom
         /// This method is useful when adding a private tag and need to explicitly set the VR of the created element.
         /// </remarks>
         /// <returns>The dataset instance.</returns>
-        /// <exception cref="ArgumentException">If tag already exists in dataset.</exception>
+        /// <exception cref="System.ArgumentException">If tag already exists in dataset.</exception>
         public DicomDataset Add<T>(DicomVR vr, DicomTag tag, params T[] values)
         {
             return DoAdd(vr, tag, values, false);
@@ -882,21 +982,6 @@ namespace FellowOakDicom
         public DicomDataset AddOrUpdate<T>(DicomVR vr, DicomTag tag, params T[] values)
         {
             return DoAdd(vr, tag, values, true);
-        }
-
-        /// <summary>
-        /// Checks the DICOM dataset to determine if the dataset already contains an item with the specified tag.
-        /// </summary>
-        /// <param name="tag">DICOM tag to test</param>
-        /// <returns><c>True</c> if a DICOM item with the specified tag already exists.</returns>
-        public bool Contains(DicomTag tag)
-        {
-            if (tag.IsPrivate)
-            {
-                var privateTag = GetPrivateTag(tag, false);
-                return (privateTag != null) && _items.Any(kv => kv.Key.Equals(privateTag));
-            }
-            return _items.ContainsKey(tag);
         }
 
         /// <summary>
@@ -1024,7 +1109,7 @@ namespace FellowOakDicom
         protected virtual void ValidateTag(DicomTag tag)
         {
         }
-        
+
         /// <summary>
         /// Add a collection of DICOM items to the dataset.
         /// </summary>
@@ -1113,13 +1198,23 @@ namespace FellowOakDicom
         private DicomDataset DoAdd<T>(DicomTag tag, IList<T> values, bool allowUpdate)
         {
             var entry = DicomDictionary.Default[tag.IsPrivate ? GetPrivateTag(tag) : tag];
-            if (entry == null)
+            if (entry == DicomDictionary.UnknownTag && tag.IsPrivate)
+            {
+                string groupNumber = tag.Group.ToString("X4");
+                string elementNumber = tag.Element.ToString("X4");
+                throw new DicomDataException($"Unknown private tag <{tag.PrivateCreator}> ({groupNumber}, {elementNumber}) has no VR defined.");
+            }
+            if (entry == DicomDictionary.UnknownTag && !tag.IsPrivate)
+            {
                 throw new DicomDataException($"Tag {tag} not found in DICOM dictionary. Only dictionary tags may be added implicitly to the dataset.");
+            }
 
             DicomVR vr = null;
-            if (values != null) vr = entry.ValueRepresentations.FirstOrDefault(x => x.ValueType == typeof(T));
-            if (vr == null) vr = entry.ValueRepresentations.First();
-
+            if (values != null) vr = Array.Find(entry.ValueRepresentations, x => x.ValueType == typeof(T));
+            if (vr == null)
+            {
+                vr = entry.ValueRepresentations[0];
+            }
             return DoAdd(vr, tag, values, allowUpdate);
         }
 
@@ -1453,6 +1548,7 @@ namespace FellowOakDicom
         }
 
 
+
         private static bool ParseVrValueFromString<T, TOut>(
             IEnumerable<T> values,
             DicomVM valueMultiplicity,
@@ -1482,7 +1578,7 @@ namespace FellowOakDicom
         private void SetTargetEncodingsToStringElements(Encoding[] values)
         {
 
-            foreach(var txt in this.FilterByType<DicomStringElement>())
+            foreach (var txt in this.FilterByType<DicomStringElement>())
             {
                 txt.TargetEncodings = values;
             }
@@ -1493,6 +1589,46 @@ namespace FellowOakDicom
         {
             // first evaluate the encoding, and then apply
             SetTargetEncodingsToStringElements(GetEncodingsForSerialization());
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (Object.ReferenceEquals(obj, null)) return false;
+            if (Object.ReferenceEquals(this, obj)) return true;
+            if (GetType() != obj.GetType()) return false;
+            return Equals(obj as DicomDataset);
+        }
+
+        public bool Equals(DicomDataset other)
+        {
+            return
+                CompareInstancesByContent
+                ? DicomDatasetComparer.DefaultInstance.Equals(this, other)
+                : ReferenceEquals(this, other);
+        }
+
+        public static bool operator ==(DicomDataset a, DicomDataset b)
+        {
+            if (((object)a == null) && ((object)b == null)) return true;
+            if (((object)a == null) || ((object)b == null)) return false;
+            return a.Equals(b);
+        }
+
+        public static bool operator !=(DicomDataset a, DicomDataset b)
+        {
+            return !(a == b);
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = new HashCode();
+
+            foreach (var element in this)
+            {
+                hashCode.Add(element);
+            }
+
+            return hashCode.ToHashCode();
         }
 
         #endregion

@@ -13,18 +13,9 @@ set GenerateDocumentation=1
 
 @dotnet build ./../Platform/FO-DICOM.Imaging.ImageSharp/FO-DICOM.Imaging.ImageSharp.csproj --configuration Release
 
-@dotnet build ./../Logging/FO-DICOM.NLog/FO-DICOM.NLog.csproj --configuration Release
+@dotnet build ./../Platform/FO-DICOM.Imaging.ImageSharp.NetStandard/FO-DICOM.Imaging.ImageSharp.NetStandard.csproj --configuration Release
+
+@dotnet build ./../Serialization/FO-DICOM.Json/FO-DICOM.Json.csproj --configuration Release
 
 
 echo.
-echo fo-dicom NuGet package builder for FO-DICOM.Imaging.Desktop
-echo ==============================
-echo. 
-echo This Windows batch file uses NuGet to automatically
-echo build the fo-dicom NuGet packages.
-echo. 
-
-timeout /T 5
-
-@nuget pack ./../Platform/FO-DICOM.Imaging.Desktop/FO-DICOM.Imaging.Desktop.nuspec -OutputDirectory ./../Platform/FO-DICOM.Imaging.Desktop/bin
-pause

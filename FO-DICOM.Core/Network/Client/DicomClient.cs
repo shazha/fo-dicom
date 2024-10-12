@@ -1,11 +1,12 @@
-// Copyright (c) 2012-2021 fo-dicom contributors.
+// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
-using FellowOakDicom.Log;
 using FellowOakDicom.Network.Client.Advanced.Association;
 using FellowOakDicom.Network.Client.Advanced.Connection;
 using FellowOakDicom.Network.Client.EventArguments;
 using FellowOakDicom.Network.Client.States;
+using FellowOakDicom.Network.Tls;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -15,6 +16,11 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+
+// DICOM client still provides some obsolete APIs that should not be removed yet, but should also not provide obsolete compiler warnings
+#pragma warning disable CS0618
+#pragma warning disable CS0612
 
 namespace FellowOakDicom.Network.Client
 {
@@ -31,9 +37,9 @@ namespace FellowOakDicom.Network.Client
         int Port { get; }
 
         /// <summary>
-        /// True if TLS security should be enabled, false otherwise.
+        /// A handler to initiate TLS security, if null then TLS is not enabled.
         /// </summary>
-        bool UseTls { get; }
+        ITlsInitiator TlsInitiator { get; }
 
         /// <summary>
         /// Calling Application Entity Title.
@@ -69,6 +75,16 @@ namespace FellowOakDicom.Network.Client
         /// Gets or sets extended negotiation items to negotiate with association.
         /// </summary>
         List<DicomExtendedNegotiation> AdditionalExtendedNegotiations { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether to require a successful user identity negotiation during association.
+        /// </summary>
+        bool RequireSuccessfulUserIdentityNegotiation { get; set; }
+
+        /// <summary>
+        /// Gets or sets the user identity to negotiate with association.
+        /// </summary>
+        DicomUserIdentityNegotiation UserIdentityNegotiation { get; set; }
 
         /// <summary>
         /// Gets or sets the fallback encoding.
@@ -112,7 +128,7 @@ namespace FellowOakDicom.Network.Client
 
         /// <summary>
         /// Whenever the DICOM client changes state, an event will be emitted containing the old state and the new state.
-        /// The current DICOM client implementation is no longer state based, and has been rewritten as a wrapper around the new <see cref="IAdvancedDicomClientConnection"/>
+        /// The current DICOM client implementation is no longer state based, and has been rewritten as a wrapper around the new <see cref="FellowOakDicom.Network.Client.Advanced.Connection.IAdvancedDicomClientConnection"/>
         /// This event handler is still supported for backwards compatibility reasons, but may be removed in the future.
         /// </summary>
         [Obsolete(nameof(StateChanged) + " is an artifact of an older state-based implementation of the DicomClient and will be deleted in the future. It only exists today for backwards compatibility purposes")]
@@ -129,6 +145,12 @@ namespace FellowOakDicom.Network.Client
         /// <param name="invoked">Asynchronous operations invoked.</param>
         /// <param name="performed">Asynchronous operations performed.</param>
         void NegotiateAsyncOps(int invoked = 0, int performed = 0);
+
+        /// <summary>
+        /// Set negotiation of user identity.
+        /// </summary>
+        /// <param name="userIdentityNegotiation">User identity negotiation information.</param>
+        void NegotiateUserIdentity(DicomUserIdentityNegotiation userIdentityNegotiation);
 
         /// <summary>
         /// Enqueues a new DICOM request for execution.
@@ -159,7 +181,7 @@ namespace FellowOakDicom.Network.Client
         private ILogger _logger;
         private DicomClientState _state;
         private long _isSending;
-        private readonly Tasks.AsyncManualResetEvent _hasMoreRequests;
+        private readonly Tools.AsyncManualResetEvent _hasMoreRequests;
 
         internal ConcurrentQueue<StrongBox<DicomRequest>> QueuedRequests { get; }
         
@@ -168,7 +190,7 @@ namespace FellowOakDicom.Network.Client
 
         public string Host { get; }
         public int Port { get; }
-        public bool UseTls { get; }
+        public ITlsInitiator TlsInitiator { get; }
         public string CallingAe { get; }
         public string CalledAe { get; }
         
@@ -184,6 +206,8 @@ namespace FellowOakDicom.Network.Client
         public DicomServiceOptions ServiceOptions { get; set; }
         public List<DicomPresentationContext> AdditionalPresentationContexts { get; set; }
         public List<DicomExtendedNegotiation> AdditionalExtendedNegotiations { get; set; }
+        public bool RequireSuccessfulUserIdentityNegotiation { get; set; }
+        public DicomUserIdentityNegotiation UserIdentityNegotiation { get; set; }
         public Encoding FallbackEncoding { get; set; }
         public DicomClientCStoreRequestHandler OnCStoreRequest { get; set; }
         public DicomClientNEventReportRequestHandler OnNEventReportRequest { get; set; }
@@ -201,22 +225,22 @@ namespace FellowOakDicom.Network.Client
         /// </summary>
         /// <param name="host">DICOM host.</param>
         /// <param name="port">Port.</param>
-        /// <param name="useTls">True if TLS security should be enabled, false otherwise.</param>
+        /// <param name="tlsInitiator">if null then no TLS is enabled, otherwise the handler to initiate TLS security.</param>
         /// <param name="callingAe">Calling Application Entity Title.</param>
         /// <param name="calledAe">Called Application Entity Title.</param>
         /// <param name="clientOptions">The options that further modify the behavior of this DICOM client</param>
         /// <param name="serviceOptions">The options that modify the behavior of the base DICOM service</param>
-        /// <param name="logger">The logger</param>
+        /// <param name="loggerFactory">The log manager that will be used to extract a default logger</param>
         /// <param name="advancedDicomClientConnectionFactory">The advanced DICOM client factory that will be used to actually send the requests</param>
-        public DicomClient(string host, int port, bool useTls, string callingAe, string calledAe,
+        public DicomClient(string host, int port, ITlsInitiator tlsInitiator, string callingAe, string calledAe,
             DicomClientOptions clientOptions,
             DicomServiceOptions serviceOptions,
-            ILogger logger,
+            ILoggerFactory loggerFactory,
             IAdvancedDicomClientConnectionFactory advancedDicomClientConnectionFactory)
         {
             Host = host;
             Port = port;
-            UseTls = useTls;
+            TlsInitiator = tlsInitiator;
             CallingAe = callingAe;
             CalledAe = calledAe;
             ClientOptions = clientOptions;
@@ -224,20 +248,31 @@ namespace FellowOakDicom.Network.Client
             QueuedRequests = new ConcurrentQueue<StrongBox<DicomRequest>>();
             AdditionalPresentationContexts = new List<DicomPresentationContext>();
             AdditionalExtendedNegotiations = new List<DicomExtendedNegotiation>();
+            RequireSuccessfulUserIdentityNegotiation = true;
             AsyncInvoked = 1;
             AsyncPerformed = 1;
             
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logger = loggerFactory.CreateLogger(Log.LogCategories.Network);
             _advancedDicomClientConnectionFactory = advancedDicomClientConnectionFactory ?? throw new ArgumentNullException(nameof(advancedDicomClientConnectionFactory));
             _state = DicomClientIdleState.Instance;
             _isSending = 0;
-            _hasMoreRequests = new Tasks.AsyncManualResetEvent();
+            _hasMoreRequests = new Tools.AsyncManualResetEvent();
         }
 
         public void NegotiateAsyncOps(int invoked = 0, int performed = 0)
         {
             AsyncInvoked = invoked;
             AsyncPerformed = performed;
+        }
+
+        public void NegotiateUserIdentity(DicomUserIdentityNegotiation userIdentity)
+        {
+            if (userIdentity != null)
+            {
+                userIdentity.Validate();
+            }
+
+            UserIdentityNegotiation = userIdentity;
         }
 
         public Task AddRequestAsync(DicomRequest dicomRequest)
@@ -307,9 +342,10 @@ namespace FellowOakDicom.Network.Client
                             {
                                 Host = Host,
                                 Port = Port,
-                                UseTls = UseTls,
+                                TlsInitiator = TlsInitiator,
                                 NoDelay = ServiceOptions.TcpNoDelay,
-                                IgnoreSslPolicyErrors = ServiceOptions.IgnoreSslPolicyErrors,
+                                ReceiveBufferSize = ServiceOptions.TcpReceiveBufferSize,
+                                SendBufferSize = ServiceOptions.TcpSendBufferSize,
                                 Timeout = TimeSpan.FromMilliseconds(ClientOptions.AssociationRequestTimeoutInMs)
                             },
                             RequestHandlers = new AdvancedDicomClientConnectionRequestHandlers
@@ -344,6 +380,7 @@ namespace FellowOakDicom.Network.Client
                             CalledAE = CalledAe,
                             MaxAsyncOpsInvoked = AsyncInvoked,
                             MaxAsyncOpsPerformed = AsyncPerformed,
+                            UserIdentityNegotiation = UserIdentityNegotiation
                         };
 
                         foreach (var request in requestsToSend)
@@ -413,6 +450,19 @@ namespace FellowOakDicom.Network.Client
                             }
                         }
 
+                        // Validate successful user identity negotiation response
+                        if (RequireSuccessfulUserIdentityNegotiation &&
+                            association.Association.UserIdentityNegotiation != null &&
+                            association.Association.UserIdentityNegotiation.ServerResponse == null)
+                        {
+                            if (association.Association.UserIdentityNegotiation.PositiveResponseRequested)
+                            {
+                                throw new DicomNetworkException($"A positive response requested for user identity type {association.Association.UserIdentityNegotiation.UserIdentityType} but server response was null");
+                            }
+
+                            _logger.LogWarning("Successful user identity negotiation with type {UserIdentityType} was required but server response was null", association.Association.UserIdentityNegotiation.UserIdentityType);
+                        }
+
                         AssociationAccepted?.Invoke(this, new AssociationAcceptedEventArgs(association.Association));
 
                         while (requestsToSend.Count > 0 && exception == null)
@@ -421,7 +471,7 @@ namespace FellowOakDicom.Network.Client
 
                             if (!connection.CanStillProcessPDataTF)
                             {
-                                _logger.Debug($"The current association can no longer accept P-DATA-TF messages, a new association will have to be created for the remaining requests");
+                                _logger.LogDebug("The current association can no longer accept P-DATA-TF messages, a new association will have to be created for the remaining requests");
                                 requestsToRetry.AddRange(requestsToSend);
                                 break;
                             }
@@ -436,9 +486,11 @@ namespace FellowOakDicom.Network.Client
                              * Furthermore, after each DICOM request completes, we also check if more requests were queued into this DICOM client
                              * This should result in a maximum throughput of DICOM requests, always utilizing the maximum of async invoked requests
                              */
-                            _logger.Debug("Sending {NumberOfRequests} requests", requestsToSend.Count);
-                            var maximumNumberOfParallelRequests = association.Association.MaxAsyncOpsInvoked;
-                            var parallelRequests = new List<Task>(maximumNumberOfParallelRequests);
+                            _logger.LogDebug("Sending {NumberOfRequests} requests", requestsToSend.Count);
+                            var maximumNumberOfParallelRequests = association.Association.MaxAsyncOpsInvoked > 0
+                                ? association.Association.MaxAsyncOpsInvoked
+                                : int.MaxValue;
+                            var parallelRequests = new List<Task>(Math.Min(requestsToSend.Count, maximumNumberOfParallelRequests));
                             while (parallelRequests.Count < maximumNumberOfParallelRequests
                                    && requestsToSend.Count > 0
                                    && connection.CanStillProcessPDataTF)
@@ -486,7 +538,7 @@ namespace FellowOakDicom.Network.Client
                                 && ClientOptions.AssociationLingerTimeoutInMs > 0
                                 && connection.CanStillProcessPDataTF)
                             {
-                                _logger.Debug($"Lingering on open association for {ClientOptions.AssociationLingerTimeoutInMs}ms");
+                                _logger.LogDebug("Lingering on open association for {AssociationLingerTimeoutInMs}ms", ClientOptions.AssociationLingerTimeoutInMs);
 
                                 SetState(DicomClientLingeringState.Instance);
                                 
@@ -522,7 +574,7 @@ namespace FellowOakDicom.Network.Client
                     }
                     catch (OperationCanceledException)
                     {
-                        _logger.Warn("DICOM request sending was cancelled");
+                        _logger.LogWarning("DICOM request sending was cancelled");
 
                         if (association != null && association.IsDisposed == false)
                         {
@@ -543,7 +595,7 @@ namespace FellowOakDicom.Network.Client
                     }
                     catch (Exception e)
                     {
-                        _logger.Error("An error occurred while sending DICOM requests: {Error}", e);
+                        _logger.LogError(e, "An error occurred while sending DICOM requests");
 
                         exception = e;
 
@@ -593,7 +645,7 @@ namespace FellowOakDicom.Network.Client
                 throw new ArgumentNullException(nameof(request));
             }
             
-            _logger.Debug("{Request} is being sent", request.ToString());
+            _logger.LogDebug("{Request} is being sent", request.ToString());
 
             try
             {
@@ -604,13 +656,13 @@ namespace FellowOakDicom.Network.Client
                     cancellationToken.ThrowIfCancellationRequested();
                 }
 
-                _logger.Debug("{Request} has completed", request.ToString());
+                _logger.LogDebug("{Request} has completed", request.ToString());
             }
             catch (DicomRequestTimedOutException e)
             {
                 RequestTimedOut?.Invoke(this, new RequestTimedOutEventArgs(e.Request, e.TimeOut));
 
-                _logger.Debug("{Request} has timed out", request.ToString());
+                _logger.LogDebug("{Request} has timed out", request.ToString());
             }
         }
         
@@ -636,7 +688,7 @@ namespace FellowOakDicom.Network.Client
 
             _state = state;
             
-            _logger.Debug($"[{oldState}] --> [{newState}]");
+            _logger.LogDebug("[{OldState}] --> [{NewState}]", oldState, newState);
 
             StateChanged?.Invoke(this, new StateChangedEventArgs(oldState, newState));
         }
@@ -649,7 +701,7 @@ namespace FellowOakDicom.Network.Client
             {
                 try
                 {
-                    await association.ReleaseAsync(cts.Token);
+                    await association.ReleaseAsync(cts.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -672,7 +724,7 @@ namespace FellowOakDicom.Network.Client
             {
                 try
                 {
-                    await association.AbortAsync(cts.Token);
+                    await association.AbortAsync(cts.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {

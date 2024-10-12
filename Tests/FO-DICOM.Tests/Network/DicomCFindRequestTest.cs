@@ -1,5 +1,6 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
 using FellowOakDicom.Network;
 using System;
@@ -8,10 +9,13 @@ using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
+// These tests cover some obsolete methods or properties
+#pragma warning disable CS0618
+
 namespace FellowOakDicom.Tests.Network
 {
 
-    [Collection("Network")]
+    [Collection(TestCollections.Network)]
     public class DicomCFindRequestTest
     {
         #region Unit Tests

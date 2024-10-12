@@ -1,8 +1,9 @@
-﻿// Copyright (c) 2012-2021 fo-dicom contributors.
+﻿// Copyright (c) 2012-2023 fo-dicom contributors.
 // Licensed under the Microsoft Public License (MS-PL).
+#nullable disable
 
-using FellowOakDicom.Log;
 using FellowOakDicom.Network.Client.Advanced.Connection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -41,10 +42,10 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
         /// C-FIND or C-MOVE requests will typically receive back a pending response per SOP instance, and finally one last success response
         /// C-STORE and C-ECHO requests on the other hand typically only receives one response
         /// </returns>
-        /// <exception cref="OperationCanceledException">When the request is cancelled using the <paramref name="cancellationToken"/></exception>
+        /// <exception cref="System.OperationCanceledException">When the request is cancelled using the <paramref name="cancellationToken"/></exception>
         /// <exception cref="System.IO.IOException">When connection/socket issues occur</exception>
         /// <exception cref="DicomNetworkException">When DICOM protocol issues occur</exception>
-        /// <exception cref="ObjectDisposedException">When the association is already disposed</exception>
+        /// <exception cref="System.ObjectDisposedException">When the association is already disposed</exception>
         IAsyncEnumerable<DicomResponse> SendRequestAsync(DicomRequest dicomRequest, CancellationToken cancellationToken);
 
         /// <summary>
@@ -54,7 +55,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
         /// </summary>
         /// <param name="cancellationToken">The token that immediately cancels the request. Note that the association will be left in an unusable state regardless.</param>
         /// <returns>A task that will complete when the association release has been acknowledged, the association is aborted or the connection is closed by the other AE.</returns>
-        /// <exception cref="ObjectDisposedException">When the association is already disposed</exception>
+        /// <exception cref="System.ObjectDisposedException">When the association is already disposed</exception>
         ValueTask ReleaseAsync(CancellationToken cancellationToken);
 
         /// <summary>
@@ -64,11 +65,13 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
         /// </summary>
         /// <param name="cancellationToken">The token that immediately cancels the abort notification. Note that the association will be left in an unusable state regardless.</param>
         /// <returns>A task that will complete when the association is aborted or the connection is closed by the other AE</returns>
-        /// <exception cref="ObjectDisposedException">When the association is already disposed</exception>
+        /// <exception cref="System.ObjectDisposedException">When the association is already disposed</exception>
         ValueTask AbortAsync(CancellationToken cancellationToken);
     }
 
-    /// <inheritdoc cref="IAdvancedDicomClientAssociation"/>>
+    /// <summary>
+    /// Represents an open DICOM association.
+    /// </summary>
     public class AdvancedDicomClientAssociation : IAdvancedDicomClientAssociation
     {
         private const string _responseChannelIsGoneNote = "(Note: the response channel is gone. This can happen when the request is cancelled after it has been sent)";
@@ -134,7 +137,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                     {
                         if (_requestChannels.TryGetValue(requestPendingEvent.Request.MessageID, out var requestChannel))
                         {
-                            _logger.Debug("Request [{MessageID}]: {Status}", requestPendingEvent.Request.MessageID, requestPendingEvent.Response.Status.State);
+                            _logger.LogDebug("Request [{MessageID}]: {Status}", requestPendingEvent.Request.MessageID, requestPendingEvent.Response.Status.State);
 
                             if (!requestChannel.Writer.TryWrite(requestPendingEvent) && !IsDisposed)
                             {
@@ -143,7 +146,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                         }
                         else
                         {
-                            _logger.Debug($"Request [{{MessageID}}]: {{Status}} {_responseChannelIsGoneNote}", requestPendingEvent.Request.MessageID, requestPendingEvent.Response.Status.State);
+                            _logger.LogDebug("Request [{MessageID}]: {Status} {ResponseChannelIsGoneNote}", requestPendingEvent.Request.MessageID, requestPendingEvent.Response.Status.State, _responseChannelIsGoneNote);
                         }
                         break;
                     }
@@ -151,7 +154,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                     {
                         if (_requestChannels.TryGetValue(requestCompletedEvent.Request.MessageID, out var requestChannel))
                         {
-                            _logger.Debug("Request [{MessageID}]: {Status}", requestCompletedEvent.Request.MessageID, requestCompletedEvent.Response.Status.State);
+                            _logger.LogDebug("Request [{MessageID}]: {Status}", requestCompletedEvent.Request.MessageID, requestCompletedEvent.Response.Status.State);
 
                             if (!requestChannel.Writer.TryWrite(requestCompletedEvent) && !IsDisposed)
                             {
@@ -162,7 +165,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                         }
                         else
                         {
-                            _logger.Debug($"Request [{{MessageID}}]: {{Status}} {_responseChannelIsGoneNote}", requestCompletedEvent.Request.MessageID, requestCompletedEvent.Response.Status.State);
+                            _logger.LogDebug("Request [{MessageID}]: {Status} {ResponseChannelIsGoneNote}", requestCompletedEvent.Request.MessageID, requestCompletedEvent.Response.Status.State, _responseChannelIsGoneNote);
                         }
                         
                         if (_connection.IsSendNextMessageRequired)
@@ -175,7 +178,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                     {
                         if (_requestChannels.TryGetValue(requestTimedOutEvent.Request.MessageID, out var requestChannel))
                         {
-                            _logger.Debug("Request [{MessageID}]: Time-Out after {Timeout}", requestTimedOutEvent.Request.MessageID, requestTimedOutEvent.Timeout);
+                            _logger.LogDebug("Request [{MessageID}]: Time-Out after {Timeout}", requestTimedOutEvent.Request.MessageID, requestTimedOutEvent.Timeout);
 
                             if (!requestChannel.Writer.TryWrite(requestTimedOutEvent) && !IsDisposed)
                             {
@@ -186,7 +189,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                         }
                         else
                         {
-                            _logger.Debug($"Request [{{MessageID}}]: Time-Out after {{Timeout}} {_responseChannelIsGoneNote}", requestTimedOutEvent.Request.MessageID, requestTimedOutEvent.Timeout);
+                            _logger.LogDebug("Request [{MessageID}]: Time-Out after {Timeout} {ResponseChannelIsGoneNote}", requestTimedOutEvent.Request.MessageID, requestTimedOutEvent.Timeout, _responseChannelIsGoneNote);
                         }
                         
                         if (_connection.IsSendNextMessageRequired)
@@ -206,7 +209,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                         {
                             if (_requestChannels.TryGetValue(messageId, out var requestChannel))
                             {
-                                _logger.Debug("Request [{MessageID}]: Aborted", messageId);
+                                _logger.LogDebug("Request [{MessageID}]: Aborted", messageId);
 
                                 if (!requestChannel.Writer.TryWrite(dicomAbortedEvent) && !IsDisposed)
                                 {
@@ -217,7 +220,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                             }
                             else
                             {
-                                _logger.Debug($"Request [{{MessageID}}]: Aborted {_responseChannelIsGoneNote}", messageId);
+                                _logger.LogDebug($"Request [{{MessageID}}]: Aborted {_responseChannelIsGoneNote}", messageId);
                             }
                         }
 
@@ -225,7 +228,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                     }
                     case DicomAssociationReleasedEvent dicomAssociationReleasedEvent:
                     {
-                        _logger.Debug("Association {Association} released", AssociationToString(Association));
+                        _logger.LogDebug("Association {Association} released", AssociationToString(Association));
 
                         if (!_associationChannel.Writer.TryWrite(dicomAssociationReleasedEvent) && !IsDisposed)
                         {
@@ -242,7 +245,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                             return;
                         }
                         
-                        _logger.Debug("Connection closed");
+                        _logger.LogDebug("Connection closed");
 
                         if (!_associationChannel.Writer.TryWrite(connectionClosedEvent) && !IsDisposed)
                         {
@@ -253,7 +256,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                         {
                             if (_requestChannels.TryGetValue(messageId, out var requestChannel))
                             {
-                                _logger.Debug("Request [{MessageID}]: Connection closed", messageId);
+                                _logger.LogDebug("Request [{MessageID}]: Connection closed", messageId);
                                 
                                 if (!requestChannel.Writer.TryWrite(connectionClosedEvent) && !IsDisposed)
                                 {
@@ -264,7 +267,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                             }
                             else
                             {
-                                _logger.Debug($"Request [{{MessageID}}]: Connection closed {_responseChannelIsGoneNote}", messageId);
+                                _logger.LogDebug($"Request [{{MessageID}}]: Connection closed {_responseChannelIsGoneNote}", messageId);
                             }
                         }
                         break;
@@ -317,33 +320,33 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                         {
                             case RequestPendingEvent requestPendingEvent:
                             {
-                                _logger.Debug("{Request}: {Response}", dicomRequest.ToString(), requestPendingEvent.Response.ToString());
+                                _logger.LogDebug("{Request}: {Response}", dicomRequest.ToString(), requestPendingEvent.Response.ToString());
 
                                 yield return requestPendingEvent.Response;
                                 break;
                             }
                             case RequestCompletedEvent requestCompletedEvent:
                             {
-                                _logger.Debug("{Request}: {Response}", dicomRequest.ToString(), requestCompletedEvent.Response.ToString());
+                                _logger.LogDebug("{Request}: {Response}", dicomRequest.ToString(), requestCompletedEvent.Response.ToString());
 
                                 yield return requestCompletedEvent.Response;
                                 yield break;
                             }
                             case RequestTimedOutEvent requestTimedOutEvent:
                             {
-                                _logger.Debug("{Request}: Time-Out after {Timeout}", dicomRequest.ToString(), requestTimedOutEvent.Timeout);
+                                _logger.LogDebug("{Request}: Time-Out after {Timeout}", dicomRequest.ToString(), requestTimedOutEvent.Timeout);
 
                                 throw new DicomRequestTimedOutException(requestTimedOutEvent.Request, requestTimedOutEvent.Timeout);
                             }
                             case DicomAbortedEvent dicomAbortedEvent:
                             {
-                                _logger.Debug("{Request}: Association was aborted", dicomRequest.ToString());
+                                _logger.LogDebug("{Request}: Association was aborted", dicomRequest.ToString());
 
                                 throw new DicomAssociationAbortedException(dicomAbortedEvent.Source, dicomAbortedEvent.Reason);
                             }
                             case ConnectionClosedEvent connectionClosedEvent:
                             {
-                                _logger.Debug("{Request}: Connection was closed", dicomRequest.ToString());
+                                _logger.LogDebug("{Request}: Connection was closed", dicomRequest.ToString());
 
                                 connectionClosedEvent.ThrowException();
 
@@ -410,7 +413,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
 
         private async Task WaitForAssociationRelease(CancellationToken cancellationToken)
         {
-            _logger.Debug("Waiting for association {Association} to be released", AssociationToString(Association));
+            _logger.LogDebug("Waiting for association {Association} to be released", AssociationToString(Association));
 
             while (await _associationChannel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -423,13 +426,13 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
                     switch (@event)
                     {
                         case DicomAssociationReleasedEvent _:
-                            _logger.Debug("Association {Association} has been released", AssociationToString(Association));
+                            _logger.LogDebug("Association {Association} has been released", AssociationToString(Association));
                             return;
                         case DicomAbortedEvent _:
-                            _logger.Debug("Association {Association} has been aborted", AssociationToString(Association));
+                            _logger.LogDebug("Association {Association} has been aborted", AssociationToString(Association));
                             return;
                         case ConnectionClosedEvent _:
-                            _logger.Debug("Connection has closed");
+                            _logger.LogDebug("Connection has closed");
                             return;
                     }
                 }
@@ -492,7 +495,7 @@ namespace FellowOakDicom.Network.Client.Advanced.Association
 
             if (!disposing)
             {
-                _logger.Warn($"DICOM association {AssociationToString(Association)} was not disposed correctly, but was garbage collected instead");
+                _logger.LogWarning($"DICOM association {AssociationToString(Association)} was not disposed correctly, but was garbage collected instead");
             }
         }
 
